@@ -124,7 +124,8 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.QML,
                 self.tr('Style File'),
-                fileFilter='QML (*.qml)'
+                fileFilter='QML (*.qml)',
+                optional = True
             )
         )
 
@@ -165,15 +166,17 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
                 optional = False
             )
         )
-
-        self.mypredicatelist = ['Bedrock',
+        # list shown in dropdown in GUI
+        self.mypredicatelist = [
+                                '1m Lidar DTM',
+                                'BGS Hydrogeology',
+                                'Bedrock',
                                 'Superficial deposits',
-                                'Mass movement',
                                 'Artificial ground',
+                                'Mass movement',
                                 'BGS Boreholes',
                                 'BGS AGS Boreholes',
-                                'BGS Hydrogeology',
-                                '1m Lidar DTM']
+                                ]
 
         self.mypredicatedefaultvalues = [index for index, predicatestring in enumerate(self.mypredicatelist)]
         self.addParameter(
@@ -460,24 +463,39 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         layerTree.insertChildNode(-1, QgsLayerTreeLayer(rasterLyr))
 
 
-    def loadBGSwms(self, layer_index):
+    def loadBGSwms(self, layer_index: int):
+        """Plots a layer onto the map. Applies transparency to make it easier 
+        to read
+        
+        Parameters
+        --------
+        layer_index: int
+            index of layer selected in list
+        
+        Returns
+        --------
+            layer on map
+        
+        """
+          
         lst_maps = ['Bedrock',
                     'Superficial deposits',
                     'Mass movement',
                     'Artificial ground']
 
         str_layer = self.mypredicatelist[layer_index]
-        uri_layer = str_layer.replace(" ", ".") # required for url
-        if str_layer in lst_maps:
-            urlWithParams = f"crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=BGS.50k.{uri_layer}&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/BGS_Detailed_Geology/MapServer/WMSServer&http-header:referer="
-        elif str_layer == 'BGS AGS Boreholes':
-            urlWithParams = "crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Boreholes&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/AGS/AGS_Export/MapServer/WMSServer"
-        elif str_layer == 'BGS Boreholes':
-            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Borehole.records&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/boreholes/MapServer/WmsServer'
+        uri_layer = str_layer.replace(" ", ".") # required for url     
+        if str_layer == '1m Lidar DTM':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Lidar_Composite_DTM_1m&styles&tilePixelRatio=0&url=https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?version%3D1.3.0")
         elif str_layer == 'BGS Hydrogeology':
-            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Hydrogeology&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/hydrogeology/MapServer/WmsServer'
-        elif str_layer == '1m Lidar DTM':
-            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Lidar_Composite_DTM_1m&styles&tilePixelRatio=0&url=https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?version%3D1.3.0'
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Hydrogeology&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/hydrogeology/MapServer/WmsServer")
+        elif str_layer in lst_maps:
+            urlWithParams = (f"crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=BGS.50k.{uri_layer}&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/BGS_Detailed_Geology/MapServer/WMSServer&http-header:referer=")
+        elif str_layer == 'BGS AGS Boreholes':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Boreholes&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/AGS/AGS_Export/MapServer/WMSServer")
+        elif str_layer == 'BGS Boreholes':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Borehole.records&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/boreholes/MapServer/WmsServer")
+
 
         rlayer = QgsRasterLayer(urlWithParams, str_layer, 'wms')
         rlayer.renderer().setOpacity(0.4)
@@ -591,9 +609,9 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             )
 
             if error == QgsVectorFileWriter.NoError:
-                feedback.pushInfo(f"Successfully wrote group '{group_name}' to GeoPackage.")
+                feedback.pushInfo(f"Successfully transformed group '{group_name}' to GeoPackage.")
             else:
-                feedback.reportError(f"Error writing group '{group_name}' to GeoPackage: {errorMessage}")
+                feedback.reportError(f"Error transforming group '{group_name}' to GeoPackage: {errorMessage}")
 
             first_layer = False
 
