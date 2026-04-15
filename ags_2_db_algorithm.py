@@ -166,19 +166,25 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        self.mypredicatelist = ['Bedrock','Superficial deposits','Mass movement', 'Artificial ground', 'Boreholes', 'Radon']
+        self.mypredicatelist = ['Bedrock',
+                                'Superficial deposits',
+                                'Mass movement',
+                                'Artificial ground',
+                                'BGS Boreholes',
+                                'BGS AGS Boreholes',
+                                'BGS Hydrogeology',
+                                '1m Lidar DTM']
+
         self.mypredicatedefaultvalues = [index for index, predicatestring in enumerate(self.mypredicatelist)]
         self.addParameter(
             QgsProcessingParameterEnum(
             self.GEOLOGYMAPS,
-            self.tr('Geology maps'),
+            self.tr('Geology and DTM maps'),
             self.mypredicatelist,
             defaultValue = self.mypredicatedefaultvalues,
             allowMultiple = True
             )
         )
-
-
 
 
     def parse_ags_file(self, file_contents):
@@ -454,20 +460,27 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         layerTree.insertChildNode(-1, QgsLayerTreeLayer(rasterLyr))
 
 
-    def loadBGSwms(self, layer_index, feedback):
+    def loadBGSwms(self, layer_index):
+        lst_maps = ['Bedrock',
+                    'Superficial deposits',
+                    'Mass movement',
+                    'Artificial ground']
 
         str_layer = self.mypredicatelist[layer_index]
-        feedback.pushInfo(f"Selected layers: {str_layer}")
         uri_layer = str_layer.replace(" ", ".") # required for url
-        if str_layer != 'Radon' or str_layer != 'Boreholes':
+        if str_layer in lst_maps:
             urlWithParams = f"crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=BGS.50k.{uri_layer}&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/BGS_Detailed_Geology/MapServer/WMSServer&http-header:referer="
-        elif str_layer == 'Radon':
-            urlWithParams = "crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Radon.1km&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/radon/MapServer/WmsServer"
-        elif str_layer == 'Boreholes':
-            urlWithParams = "crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Borehole.records&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/boreholes/MapServer/WmsServer"
+        elif str_layer == 'BGS AGS Boreholes':
+            urlWithParams = "crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Boreholes&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/AGS/AGS_Export/MapServer/WMSServer"
+        elif str_layer == 'BGS Boreholes':
+            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Borehole.records&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/boreholes/MapServer/WmsServer'
+        elif str_layer == 'BGS Hydrogeology':
+            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Hydrogeology&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/hydrogeology/MapServer/WmsServer'
+        elif str_layer == '1m Lidar DTM':
+            urlWithParams = 'crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Lidar_Composite_DTM_1m&styles&tilePixelRatio=0&url=https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?version%3D1.3.0'
+
         rlayer = QgsRasterLayer(urlWithParams, str_layer, 'wms')
-        #if str_layer != 'Boreholes':
-        #    rlayer.renderer().setOpacity(0.4)
+        rlayer.renderer().setOpacity(0.4)
         QgsProject.instance().addMapLayer(rlayer)
 
 
@@ -607,7 +620,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         # Create geology maps
         feedback.pushInfo(f"GEOLOGYMAPS: {self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context)}")
         for index in self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context):
-            self.loadBGSwms(index, feedback)
+            self.loadBGSwms(index)
 
         # create basemap
         if self.parameterAsFile(parameters, self.BASEMAP, context) == 'true':
