@@ -38,8 +38,9 @@ from qgis.core import (QgsApplication,
                        QgsProcessingParameterEnum,
                        QgsProcessingParameterFile,
                        QgsProcessingParameterFileDestination,
-                       QgsProcessingParameterCrs,
                        QgsProcessingParameterBoolean,
+                       QgsProcessingParameterCrs,
+                       QgsProcessingParameterString,
                        QgsCoordinateReferenceSystem,
                        QgsVectorLayer,
                        QgsRasterLayer,
@@ -63,7 +64,7 @@ from io import StringIO
 import os
 from pathlib import Path
 from datetime import datetime
-# import sqlite3
+import sqlite3
 from qgis.utils import iface
 from osgeo import ogr
 
@@ -94,6 +95,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
     QML = 'QML'
     BASEMAP = 'BASEMAP'
     GEOLOGYMAPS = 'GEOLOGYMAPS'
+    USER = 'USER'
 
     def initAlgorithm(self, config):
         """
@@ -103,6 +105,16 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         # We add the input vector features source. It can have any kind of
         # geometry.
+
+        self.addParameter(
+            QgsProcessingParameterString(
+                self.USER,
+                self.tr('Initials or name of user'),
+                optional = True
+
+            )
+        )
+
         self.addParameter(
             QgsProcessingParameterFile(
                 self.INPUT,
@@ -150,12 +162,12 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        self.addParameter(
-            QgsProcessingParameterFileDestination(
-                self.OUTPUTFOLDER,
-                self.tr('Output Folder')
-            )
-        )
+        # self.addParameter(
+            # QgsProcessingParameterFileDestination(
+                # self.OUTPUTFOLDER,
+                # self.tr('Output Folder')
+            # )
+        # )
 
 
         self.addParameter(
@@ -178,7 +190,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
                                 'BGS AGS Boreholes',
                                 ]
 
-        self.mypredicatedefaultvalues = [index for index, predicatestring in enumerate(self.mypredicatelist)]
+        self.mypredicatedefaultvalues = [2]
         self.addParameter(
             QgsProcessingParameterEnum(
             self.GEOLOGYMAPS,
@@ -356,14 +368,78 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         return layer
 
-    def create_database_connection(self, file_path, feedback):
+    def create_database_connection(self, gpkg_filepath, feedback):
         # Only works for gpkg
         md = QgsProviderRegistry.instance().providerMetadata("ogr")
-        conn = md.createConnection(file_path, {})
-        conn_name = os.path.splitext(os.path.basename(file_path))[0]
+        conn = md.createConnection(gpkg_filepath, {})
+        conn_name = os.path.splitext(os.path.basename(gpkg_filepath))[0]
         md.saveConnection(conn, conn_name)
         # Refresh database connections in the Browser Panel
         iface.browserModel().reload()
+
+
+    def add_meta_and_version_tables(self, ags_filepath, gpkg_filepath, user, feedback):
+        """add new tables to help version control of data set
+        As well as the table, the schema needs to be updated and
+        it would be useful to add some data"""
+        datetime_now = datetime.now()
+
+        create_cct_sql = ('CREATE TABLE "change_control" ( '
+                            '"id"    INTEGER, '
+                            '"description"   TEXT, '
+                            '"purpose"   TEXT, '
+                            '"datetime"  TEXT, '
+                            '"authored_by"   TEXT, '
+                            '"reviewed_by"   TEXT, '
+                            'PRIMARY KEY("id" AUTOINCREMENT)'
+                            ')')
+
+        create_sdt_sql = ('CREATE TABLE "source_data" ( '
+                            '"id"    INTEGER, '
+                            '"ags_file_name" TEXT, '
+                            '"geopackage_created_by" TEXT, '
+                            '"geopackage_created_datetime"   TEXT, '
+                            'PRIMARY KEY("id" AUTOINCREMENT)'
+                            ')')
+
+        cc_data_sql = 'INSERT INTO change_control values (?,?,?,?,?,?)'
+        sd_data_sql = 'INSERT INTO source_data values (?,?,?,?)'
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute(create_cct_sql)
+                cursor.execute(create_sdt_sql)
+            conn.commit()
+            feedback.pushInfo("Added version control tables")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) VALUES('change_control', 'attributes', 'change_control', '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0, 0, 0, 0, 0);")
+                cursor.execute("INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) VALUES('source_data', 'attributes', 'source_data', '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0, 0, 0, 0, 0);")
+                cursor.execute("INSERT INTO gpkg_ogr_contents (table_name, feature_count) VALUES('source_data', 1);")
+                cursor.execute("INSERT INTO gpkg_ogr_contents (table_name, feature_count) VALUES('Change_control', 1);")
+                feedback.pushInfo("contents1 done")
+            conn.commit()
+            feedback.pushInfo("Added data to contents")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute(cc_data_sql,(0, "Initial creation", "For review", datetime_now, user, None))
+                cursor.execute(sd_data_sql, (0, ags_filepath, user, datetime_now))
+            conn.commit()
+            feedback.pushInfo("Added data to version control tables")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        conn.close()
+        feedback.pushInfo("Control tables updated")
 
     def add_svg_paths(self, feedback):
 
@@ -464,27 +540,27 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 
     def loadBGSwms(self, layer_index: int):
-        """Plots a layer onto the map. Applies transparency to make it easier 
+        """Plots a layer onto the map. Applies transparency to make it easier
         to read
-        
+
         Parameters
         --------
         layer_index: int
             index of layer selected in list
-        
+
         Returns
         --------
-            layer on map
-        
+            BGS layer on map
+
         """
-          
+
         lst_maps = ['Bedrock',
                     'Superficial deposits',
                     'Mass movement',
                     'Artificial ground']
 
         str_layer = self.mypredicatelist[layer_index]
-        uri_layer = str_layer.replace(" ", ".") # required for url     
+        uri_layer = str_layer.replace(" ", ".") # required for url
         if str_layer == '1m Lidar DTM':
             urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Lidar_Composite_DTM_1m&styles&tilePixelRatio=0&url=https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?version%3D1.3.0")
         elif str_layer == 'BGS Hydrogeology':
@@ -515,12 +591,13 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         root.removeChildNode(group)
 
 
-
     def processAlgorithm(self, parameters, context, feedback):
         # Define the output path
         output_path = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
         ext = os.path.splitext(output_path)[1].lower()
 #        feedback.pushInfo(f"Writing all groups GeoPackage to: {output_path}")
+
+        user = self.parameterAsString(parameters, self.USER, context)
 
         # Remove existing GeoPackage if it exists
         if os.path.exists(output_path):
@@ -617,6 +694,11 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo("ALL GROUPS WRITTEN - DB CREATED")
 
+        # add version control tables
+        self.add_meta_and_version_tables(ags_file_path, output_path, user, feedback)
+
+        feedback.pushInfo("Metadata groups added")
+
         # After the writing is done, call the helper functions:
         self.add_svg_paths(feedback)
 
@@ -626,20 +708,13 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         else:
             qml_path = os.path.join(os.path.dirname(__file__), 'styles', 'loca_spatial.qml')
             feedback.pushInfo(f"{qml_path = }")
-
-
         # Copy the file from its temp location
         new_output_path = self.copy_files(parameters, context, output_path, feedback)
-
-
         self.create_database_connection(new_output_path, feedback)
-
-
         # Create geology maps
         feedback.pushInfo(f"GEOLOGYMAPS: {self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context)}")
         for index in self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context):
             self.loadBGSwms(index)
-
         # create basemap
         if self.parameterAsFile(parameters, self.BASEMAP, context) == 'true':
             urlWithParams = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -648,7 +723,6 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         self.load_all_layers(new_output_path)
         self.ApplyStyle('LOCA', qml_path, feedback)
         self.group_view(new_output_path, False)
-
         # zoom map to LOCA layer
         layer = QgsProject.instance().mapLayersByName("LOCA")[0]
         layer_extent = layer.extent()
