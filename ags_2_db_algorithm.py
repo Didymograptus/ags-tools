@@ -106,20 +106,30 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         # We add the input vector features source. It can have any kind of
         # geometry.
 
-        self.addParameter(
-            QgsProcessingParameterString(
-                self.USER,
-                self.tr('Initials or name of user'),
-                optional = True
-
-            )
-        )
 
         self.addParameter(
             QgsProcessingParameterFile(
                 self.INPUT,
                 self.tr('Input File'),
                 fileFilter='AGS (*.ags)'
+
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFileDestination(
+                self.OUTPUT,
+                self.tr('Output File'),
+                fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)'
+
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterString(
+                self.USER,
+                self.tr('Initials or name of user, skip to use the system login name'),
+                optional = True
 
             )
         )
@@ -153,14 +163,6 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        self.addParameter(
-            QgsProcessingParameterFileDestination(
-                self.OUTPUT,
-                self.tr('Output File'),
-                fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)'
-
-            )
-        )
 
         # self.addParameter(
             # QgsProcessingParameterFileDestination(
@@ -190,14 +192,15 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
                                 'BGS AGS Boreholes',
                                 ]
 
-        self.mypredicatedefaultvalues = [2]
+        # self.mypredicatedefaultvalues = [2]
         self.addParameter(
             QgsProcessingParameterEnum(
             self.GEOLOGYMAPS,
             self.tr('Geology and DTM maps'),
             self.mypredicatelist,
-            defaultValue = self.mypredicatedefaultvalues,
-            allowMultiple = True
+            defaultValue = None, # self.mypredicatedefaultvalues,
+            allowMultiple = True,
+            optional = True
             )
         )
 
@@ -383,6 +386,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         As well as the table, the schema needs to be updated and
         it would be useful to add some data"""
         datetime_now = datetime.now()
+        ags_file = Path(ags_filepath).stem
 
         create_cct_sql = ('CREATE TABLE "change_control" ( '
                             '"id"    INTEGER, '
@@ -432,7 +436,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             with sqlite3.connect(gpkg_filepath) as conn:
                 cursor = conn.cursor()
                 cursor.execute(cc_data_sql,(0, "Initial creation", "For review", datetime_now, user, None))
-                cursor.execute(sd_data_sql, (0, ags_filepath, user, datetime_now))
+                cursor.execute(sd_data_sql, (0, ags_file, user, datetime_now))
             conn.commit()
             feedback.pushInfo("Added data to version control tables")
         except sqlite3.OperationalError as e:
@@ -479,11 +483,13 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         layer = QgsProject.instance().mapLayersByName(layer_name)
 
-
-        if layer[0] and os.path.exists(qml_path):
-            layer[0].loadNamedStyle(qml_path)
-            layer[0].triggerRepaint()
-            feedback.pushInfo("Applied QML style to the LOCA layer.")
+        try:
+            if layer[0] and os.path.exists(qml_path):
+                layer[0].loadNamedStyle(qml_path)
+                layer[0].triggerRepaint()
+                feedback.pushInfo("Applied QML style to the LOCA layer.")
+        except:
+                feedback.pushInfo("QML style failed to apply to the LOCA layer.")
 
 
     def load_all_layers(self, gpkg_path):
@@ -574,7 +580,8 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 
         rlayer = QgsRasterLayer(urlWithParams, str_layer, 'wms')
-        rlayer.renderer().setOpacity(0.4)
+        if 'Boreholes' not in str_layer:
+            rlayer.renderer().setOpacity(0.4)
         QgsProject.instance().addMapLayer(rlayer)
 
 
@@ -597,7 +604,10 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         ext = os.path.splitext(output_path)[1].lower()
 #        feedback.pushInfo(f"Writing all groups GeoPackage to: {output_path}")
 
-        user = self.parameterAsString(parameters, self.USER, context)
+        if self.parameterAsString(parameters, self.USER, context):
+            user = self.parameterAsString(parameters, self.USER, context)
+        else:
+            user =os.getlogin( )
 
         # Remove existing GeoPackage if it exists
         if os.path.exists(output_path):
@@ -693,12 +703,9 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             first_layer = False
 
         feedback.pushInfo("ALL GROUPS WRITTEN - DB CREATED")
-
         # add version control tables
         self.add_meta_and_version_tables(ags_file_path, output_path, user, feedback)
-
         feedback.pushInfo("Metadata groups added")
-
         # After the writing is done, call the helper functions:
         self.add_svg_paths(feedback)
 
@@ -708,9 +715,6 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         else:
             qml_path = os.path.join(os.path.dirname(__file__), 'styles', 'loca_spatial.qml')
             feedback.pushInfo(f"{qml_path = }")
-        # Copy the file from its temp location
-        new_output_path = self.copy_files(parameters, context, output_path, feedback)
-        self.create_database_connection(new_output_path, feedback)
         # Create geology maps
         feedback.pushInfo(f"GEOLOGYMAPS: {self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context)}")
         for index in self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context):
@@ -720,14 +724,18 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             urlWithParams = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
             self.loadXYZ(urlWithParams, 'Open Streetmap')
 
+        # Copy the file from its temp location
+        new_output_path = self.copy_files(parameters, context, output_path, feedback)
+        self.create_database_connection(new_output_path, feedback)
         self.load_all_layers(new_output_path)
         self.ApplyStyle('LOCA', qml_path, feedback)
         self.group_view(new_output_path, False)
+        proj = QgsProject.instance()
+        proj.setCrs(QgsCoordinateReferenceSystem(27700))
         # zoom map to LOCA layer
-        layer = QgsProject.instance().mapLayersByName("LOCA")[0]
-        layer_extent = layer.extent()
+        vlayer = QgsVectorLayer(new_output_path, "LOCA", "ogr")
         canvas = iface.mapCanvas()
-        canvas.setExtent(layer_extent)
+        canvas.setExtent(vlayer.extent())
         canvas.refresh()
 
         return {self.OUTPUT: new_output_path}
