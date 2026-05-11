@@ -138,15 +138,12 @@ Each export creates `manifest.csv` recording:
 
 - **[DATA_FLOW.md](DATA_FLOW.md)** — Complete data flow diagram and pathway explanations
 - **[DOCUMENTATION - work in progress.md](DOCUMENTATION%20-%20work%20in%20progress.md)** — Detailed algorithm specifications and deduplication logic
-- **[DEDUPLICATION_AND_APPEND_LOGIC.md](DEDUPLICATION_AND_APPEND_LOGIC.md)** — Deep dive on dedup key, append logic, and lineage scenarios
 
 ## Testing
 
-Sample AGS file provided: `test/data/Esholt.ags`
-
 Run unit tests:
 ```bash
-python -m pytest test/
+python -m pytest test/f
 ```
 
 ## Troubleshooting
@@ -184,19 +181,13 @@ This plugin is actively maintained. For issues, feature requests, or contributio
 - Suggest features with use case context
 - Pull requests welcome
 
-## License
-
-Licensed under **GPL-2.0-or-later**
-
-Uses the **British Geological Survey AGSAPI** for validation.  
-Contains public sector information licensed under the **Open Government Licence v3.0**.  
-See: https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/
 
 ## Authors
 
 - Oliver Burdekin (burdGIS) — Original author
 - Richard Meredith (GeoEnvironmental) — Contributor
 
+- Faith Hamieson - CSV export Contributor 
 ---
 
 **Questions?** See the detailed documentation files or check the sample workflow in the tests folder.
