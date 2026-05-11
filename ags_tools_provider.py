@@ -33,6 +33,10 @@ __revision__ = '$Format:%H$'
 from qgis.core import QgsProcessingProvider
 from .ags_2_db_algorithm import AGS2DBAlgorithm
 from .ags_validator import AGSValidatorAlgorithm
+<<<<<<< HEAD
+=======
+from .db_2_csv_algorithm import DB2CSVAlgorithm
+>>>>>>> clean-feature
 
 
 class AGSToolsProvider(QgsProcessingProvider):
@@ -56,8 +60,12 @@ class AGSToolsProvider(QgsProcessingProvider):
         """
         self.addAlgorithm(AGS2DBAlgorithm())
         self.addAlgorithm(AGSValidatorAlgorithm())
+<<<<<<< HEAD
         # add additional algorithms here
         # self.addAlgorithm(MyOtherAlgorithm())
+=======
+        self.addAlgorithm(DB2CSVAlgorithm())
+>>>>>>> clean-feature
 
     def id(self):
         """
