@@ -1,4 +1,4 @@
-# AGS Tools: Plugin Functionality, Data Pipeline & Deduplication Logic
+# AGS Tools: Plugin Functionality &  Data Pipeline
 
 ## Overview
 
@@ -327,7 +327,7 @@ BH1     | 56.8    | sample.ags|ags_csv_export|BH-001  (NEW)
 BH2     | 62.3    | sample.ags|ags_csv_export|BH-001  (NEW)
 ```
 
-✅ **Safe:** Same source = same data, no duplicates
+ **Safe:** Same source = same data, no duplicates
 
 ---
 
@@ -388,7 +388,7 @@ BH1     | 56.8    | sample.ags|sample.gpkg|BH-001|project_exports (NEW)
 BH2     | 62.3    | sample.ags|sample.gpkg|BH-001|project_exports (NEW)
 ```
 
-✅ **Safe:** Same DB source = rows replaced; different folders tracked in source_file but not duplicated
+ **Safe:** Same DB source = rows replaced; different folders tracked in source_file but not duplicated
 
 ---
 
@@ -417,7 +417,7 @@ Example: `sample.gpkg|ags_csv_export`
 5. CSVExporter removes old rows with matching prefix
 6. Appends new rows
 
-✅ **Safe:** Same DB + folder = rows replaced
+ **Safe:** Same DB + folder = rows replaced
 
 #### Third Export - Append Mode, New CSV Folder
 1. User exports same `sample.gpkg` to **new** folder `new_export`
@@ -434,7 +434,7 @@ BH1     | 56.8    | sample.ags|sample.gpkg|BH-001|new_export
 BH2     | 62.3    | sample.ags|sample.gpkg|BH-001|new_export
 ```
 
-⚠️ **Important:** Re-exporting same DB to new CSV folder **removes** old folder's rows (same base source). If you want to keep both, append them to the **same folder**.
+ **Important:** Re-exporting same DB to new CSV folder **removes** old folder's rows (same base source). If you want to keep both, append them to the **same folder**.
 
 ---
 
@@ -467,11 +467,11 @@ sample.ags|ags_csv_export|BH-001           | SAMP.csv  | 5         | 2026-05-10
 
 | Scenario | Dedup Key | Result |
 |----------|-----------|--------|
-| AGS to CSV, re-export same file, same folder | `sample.ags` + folder + proj | Old rows replaced ✅ |
-| AGS to CSV, re-export same file, different folder | `sample.ags` + folder + proj | Old folder's rows removed, new folder's rows added ⚠️ |
-| AGS to DB, re-export to same DB | `sample.ags` + db + proj | DB table updated, no duplicates ✅ |
-| DB to CSV, same DB, same folder | `sample.ags` + db + proj | Old rows replaced ✅ |
-| DB to CSV, same DB, different folder | `sample.ags` + db + proj | Old folder's rows removed, new folder's rows added ⚠️ |
+| AGS to CSV, re-export same file, same folder | `sample.ags` + folder + proj | Old rows replaced |
+| AGS to CSV, re-export same file, different folder | `sample.ags` + folder + proj | Old folder's rows removed, new folder's rows added |
+| AGS to DB, re-export to same DB | `sample.ags` + db + proj | DB table updated, no duplicates |
+| DB to CSV, same DB, same folder | `sample.ags` + db + proj | Old rows replaced |
+| DB to CSV, same DB, different folder | `sample.ags` + db + proj | Old folder's rows removed, new folder's rows added |
 
 ---
 
