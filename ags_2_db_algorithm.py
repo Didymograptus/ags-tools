@@ -596,7 +596,10 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 					"hdph", "wins", "wstg", "wstd", "mong", "mond", "dcpg", "dcpt", "dprg", "icbr",
 					"ipid", "ivan", "chis", "ptim", "lpdn", "llpl", "grat", "grag", "mcvg", "lnmc",
 					"mcvt", "cbrg", "cbrt", "cmpg", "cmpt", "cong", "cons", "shbg", "shbt", "trig",
-					"trit", "gchm", "eres"
+					"trit", "gchm", "eres",
+					"spec", "cdia", "disc", "dlog", "dobs", "dprb", "drem", "fghg", "flsh", "hdia",
+					"horn", "iden", "ifid", "ipen", "iprg", "iprt", "irdx", "ires", "isag", "isat",
+					"pltg", "pmtg", "pumt", "scdg", "scpp", "scpt", "wadd", "wgpg", "wgpt"
 				]
 				
 				for table in tables:

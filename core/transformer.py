@@ -724,3 +724,178 @@ class AGSTransformer:
             df, "eres",
             extra_cols={"samp_id": self._samp_id_series(df)},
         )
+
+    def transform_spec(self) -> pd.DataFrame:
+        df = self.parser.get_group("SPEC")
+        if df is None:
+            return self._empty_df("spec")
+        return self._pass_through(df, "spec")
+
+    def transform_cdia(self) -> pd.DataFrame:
+        df = self.parser.get_group("CDIA")
+        if df is None:
+            return self._empty_df("cdia")
+        return self._pass_through(df, "cdia")
+
+    def transform_disc(self) -> pd.DataFrame:
+        df = self.parser.get_group("DISC")
+        if df is None:
+            return self._empty_df("disc")
+        return self._pass_through(df, "disc")
+
+    def transform_dlog(self) -> pd.DataFrame:
+        df = self.parser.get_group("DLOG")
+        if df is None:
+            return self._empty_df("dlog")
+        return self._pass_through(df, "dlog")
+
+    def transform_dobs(self) -> pd.DataFrame:
+        df = self.parser.get_group("DOBS")
+        if df is None:
+            return self._empty_df("dobs")
+        return self._pass_through(df, "dobs")
+
+    def transform_dprb(self) -> pd.DataFrame:
+        df = self.parser.get_group("DPRB")
+        if df is None:
+            return self._empty_df("dprb")
+        return self._pass_through(df, "dprb")
+
+    def transform_drem(self) -> pd.DataFrame:
+        df = self.parser.get_group("DREM")
+        if df is None:
+            return self._empty_df("drem")
+        return self._pass_through(df, "drem")
+
+    def transform_fghg(self) -> pd.DataFrame:
+        df = self.parser.get_group("FGHG")
+        if df is None:
+            return self._empty_df("fghg")
+        return self._pass_through(df, "fghg")
+
+    def transform_flsh(self) -> pd.DataFrame:
+        df = self.parser.get_group("FLSH")
+        if df is None:
+            return self._empty_df("flsh")
+        return self._pass_through(df, "flsh")
+
+    def transform_hdia(self) -> pd.DataFrame:
+        df = self.parser.get_group("HDIA")
+        if df is None:
+            return self._empty_df("hdia")
+        return self._pass_through(df, "hdia")
+
+    def transform_horn(self) -> pd.DataFrame:
+        df = self.parser.get_group("HORN")
+        if df is None:
+            return self._empty_df("horn")
+        return self._pass_through(df, "horn")
+
+    def transform_iden(self) -> pd.DataFrame:
+        df = self.parser.get_group("IDEN")
+        if df is None:
+            return self._empty_df("iden")
+        return self._pass_through(df, "iden")
+
+    def transform_ifid(self) -> pd.DataFrame:
+        df = self.parser.get_group("IFID")
+        if df is None:
+            return self._empty_df("ifid")
+        return self._pass_through(df, "ifid")
+
+    def transform_ipen(self) -> pd.DataFrame:
+        df = self.parser.get_group("IPEN")
+        if df is None:
+            return self._empty_df("ipen")
+        return self._pass_through(df, "ipen")
+
+    def transform_iprg(self) -> pd.DataFrame:
+        df = self.parser.get_group("IPRG")
+        if df is None:
+            return self._empty_df("iprg")
+        return self._pass_through(df, "iprg")
+
+    def transform_iprt(self) -> pd.DataFrame:
+        df = self.parser.get_group("IPRT")
+        if df is None:
+            return self._empty_df("iprt")
+        return self._pass_through(df, "iprt")
+
+    def transform_irdx(self) -> pd.DataFrame:
+        df = self.parser.get_group("IRDX")
+        if df is None:
+            return self._empty_df("irdx")
+        return self._pass_through(df, "irdx")
+
+    def transform_ires(self) -> pd.DataFrame:
+        df = self.parser.get_group("IRES")
+        if df is None:
+            return self._empty_df("ires")
+        return self._pass_through(df, "ires")
+
+    def transform_isag(self) -> pd.DataFrame:
+        df = self.parser.get_group("ISAG")
+        if df is None:
+            return self._empty_df("isag")
+        return self._pass_through(df, "isag")
+
+    def transform_isat(self) -> pd.DataFrame:
+        df = self.parser.get_group("ISAT")
+        if df is None:
+            return self._empty_df("isat")
+        return self._pass_through(df, "isat")
+
+    def transform_pltg(self) -> pd.DataFrame:
+        df = self.parser.get_group("PLTG")
+        if df is None:
+            return self._empty_df("pltg")
+        return self._pass_through(df, "pltg")
+
+    def transform_pmtg(self) -> pd.DataFrame:
+        df = self.parser.get_group("PMTG")
+        if df is None:
+            return self._empty_df("pmtg")
+        return self._pass_through(df, "pmtg")
+
+    def transform_pumt(self) -> pd.DataFrame:
+        df = self.parser.get_group("PUMT")
+        if df is None:
+            return self._empty_df("pumt")
+        return self._pass_through(df, "pumt")
+
+    def transform_scdg(self) -> pd.DataFrame:
+        df = self.parser.get_group("SCDG")
+        if df is None:
+            return self._empty_df("scdg")
+        return self._pass_through(df, "scdg")
+
+    def transform_scpp(self) -> pd.DataFrame:
+        df = self.parser.get_group("SCPP")
+        if df is None:
+            return self._empty_df("scpp")
+        return self._pass_through(df, "scpp")
+
+    def transform_scpt(self) -> pd.DataFrame:
+        df = self.parser.get_group("SCPT")
+        if df is None:
+            return self._empty_df("scpt")
+        return self._pass_through(df, "scpt")
+
+    def transform_wadd(self) -> pd.DataFrame:
+        df = self.parser.get_group("WADD")
+        if df is None:
+            return self._empty_df("wadd")
+        return self._pass_through(df, "wadd")
+
+    def transform_wgpg(self) -> pd.DataFrame:
+        df = self.parser.get_group("WGPG")
+        if df is None:
+            return self._empty_df("wgpg")
+        return self._pass_through(df, "wgpg")
+
+    def transform_wgpt(self) -> pd.DataFrame:
+        df = self.parser.get_group("WGPT")
+        if df is None:
+            return self._empty_df("wgpt")
+        return self._pass_through(df, "wgpt")
+
