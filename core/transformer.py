@@ -244,23 +244,23 @@ class AGSTransformer:
         """
         Calculate and inject ELEV_* columns for all depth columns in this table.
         Formula: ELEV_<depth_col> = LOCA_GL - <depth_col>
-        
+
         Creates one ELEV_* column for each depth column found in the table.
         """
         depth_cols = self.ELEVATION_DEPTH_COLUMNS.get(table_name, [])
         if not depth_cols:
             return out
-        
+
         if "LOCA_ID" not in out.columns:
             return out
-        
+
         loca_ids = out["LOCA_ID"].where(out["LOCA_ID"].notna(), "").astype(str)
         loca_gl = loca_ids.map(self.loca_gl_lookup).apply(self._safe_float)
-        
+
         # For each depth column in this table, create an ELEV_* column
         for depth_col in depth_cols:
             elev_col_name = f"ELEV_{depth_col}"
-            
+
             # Only calculate if the depth column exists in the dataframe
             if depth_col in out.columns:
                 depth = out[depth_col].apply(self._safe_float)
@@ -268,14 +268,26 @@ class AGSTransformer:
                     (gl - d) if (gl is not None and d is not None) else None
                     for gl, d in zip(loca_gl, depth)
                 ]
-        
+
         return out
 
     def _inject_filter_columns(self, out: pd.DataFrame, table_name: str = None) -> pd.DataFrame:
+        """
+        Injects calculated filter columns (e.g., GEOL_LEG, GEOL_GEO2, GEOL_GEOL) into the DataFrame.
+        These columns are only added for specific tables.
+        """
+        # List of tables where geology-related columns should be added
+        tables_with_geology = {
+            "geol", "core", "dlog", "detl", "samp", "spec", "dobs", "disc",
+            "scpt", "ispt", "trit", "cbrt", "dcpt", "dprg",
+            "weth", "frac", "fghg", "flsh", "iden", "isag"
+        }
+
+        if table_name not in tables_with_geology:
+            return out
+
         if "LOCA_ID" in out.columns:
             loca_ids = out["LOCA_ID"].where(out["LOCA_ID"].notna(), "").astype(str)
-            mapped_loca_clst = loca_ids.map(self.loca_clst_lookup)
-            mapped_loca_type = loca_ids.map(self.loca_type_lookup)
             mapped_geol_leg = self._map_geol_value_by_interval(out, table_name, "GEOL_LEG")
             if mapped_geol_leg is None:
                 mapped_geol_leg = loca_ids.map(self.geol_leg_lookup)
@@ -286,27 +298,9 @@ class AGSTransformer:
             if mapped_geol_geol is None:
                 mapped_geol_geol = loca_ids.map(self.geol_geol_lookup)
         else:
-            mapped_loca_clst = None
-            mapped_loca_type = None
             mapped_geol_leg = None
             mapped_geol_geo2 = None
             mapped_geol_geol = None
-
-        if "LOCA_CLST" in out.columns:
-            if mapped_loca_clst is not None:
-                out["LOCA_CLST"] = out["LOCA_CLST"].where(
-                    out["LOCA_CLST"].notna(), mapped_loca_clst
-                )
-        else:
-            out["LOCA_CLST"] = mapped_loca_clst
-
-        if "LOCA_TYPE" in out.columns:
-            if mapped_loca_type is not None:
-                out["LOCA_TYPE"] = out["LOCA_TYPE"].where(
-                    out["LOCA_TYPE"].notna(), mapped_loca_type
-                )
-        else:
-            out["LOCA_TYPE"] = mapped_loca_type
 
         if "GEOL_LEG" in out.columns:
             if mapped_geol_leg is not None:

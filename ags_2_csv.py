@@ -25,6 +25,7 @@ Deduplication: Prefix-match on first 3 pipe parts prevents duplicates on re-expo
 import os
 from pathlib import Path
 
+import pandas as pd
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import (
