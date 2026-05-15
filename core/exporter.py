@@ -21,6 +21,14 @@ class CSVExporter:
         self.manifest_rows = []
         self.sources_written = set()  # Track sources being written in this export
 
+    @staticmethod
+    def _drop_ags_metadata_rows(df: pd.DataFrame) -> pd.DataFrame:
+        """Remove AGS metadata rows (HEADING=TYPE/UNIT) from exported table rows."""
+        if df is None or df.empty or "HEADING" not in df.columns:
+            return df
+        heading = df["HEADING"].astype(str).str.strip().str.upper()
+        return df[~heading.isin(["TYPE", "UNIT"])].copy()
+
     def _extract_dedup_key(self, source_file: str) -> str:
         """
         Extract dedup key from source_file for prefix-match comparison.
@@ -36,10 +44,14 @@ class CSVExporter:
         """Write or append a table DataFrame to CSV, replacing previous rows from the same source."""
         table_name_upper = table_name.upper()
         path = os.path.join(self.output_dir, f"{table_name_upper}.csv")
+
+        # Ensure outgoing table rows do not include AGS TYPE/UNIT metadata rows.
+        df = self._drop_ags_metadata_rows(df)
         
         if self.append_mode and os.path.exists(path):
             # Append mode: read existing CSV, remove rows from same base source, then append new data
             existing_df = pd.read_csv(path, encoding="utf-8-sig")
+            existing_df = self._drop_ags_metadata_rows(existing_df)
             
             # Remove existing rows where source_file has same dedup key (ags_filename|db_name|project_id)
             # This ensures re-exports of the same source replace old data, even if CSV folder differs

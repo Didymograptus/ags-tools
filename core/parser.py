@@ -27,8 +27,30 @@ class AGSParser:
                 "Missing AGS parser dependency. Install 'python-ags4' in the QGIS Python environment."
             )
         tables, headings = AGS4.AGS4_to_dataframe(self.filepath)
-        # python-ags4 returns dicts of {GROUP_NAME: DataFrame}
-        self.tables = tables
+        # python-ags4 returns dicts of {GROUP_NAME: DataFrame}. Some AGS files
+        # include UNIT/TYPE metadata rows in either index or HEADING column.
+        # Remove these here so all downstream exports are consistently data-only.
+        cleaned_tables = {}
+        for group_name, df in tables.items():
+            if df is None:
+                cleaned_tables[group_name] = df
+                continue
+
+            out = df.copy()
+
+            # Drop metadata rows when they are encoded as index labels.
+            if out.index is not None:
+                idx = out.index.astype(str).str.strip().str.upper()
+                out = out[~idx.isin(["UNIT", "TYPE"])]
+
+            # Drop metadata rows when they are encoded in a HEADING column.
+            if "HEADING" in out.columns:
+                heading = out["HEADING"].astype(str).str.strip().str.upper()
+                out = out[~heading.isin(["UNIT", "TYPE"])]
+
+            cleaned_tables[group_name] = out.reset_index(drop=True)
+
+        self.tables = cleaned_tables
         self.headings = headings
         return True
 

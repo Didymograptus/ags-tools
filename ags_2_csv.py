@@ -72,9 +72,8 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     OUTPUT_FOLDER_NAME = "OUTPUT_FOLDER_NAME"
     ALLOW_APPEND = "ALLOW_APPEND"
 
-    # List of AGS groups to export, in order
-    # Each group will be transformed, column-filtered, and written to uppercase.csv
-    TABLES = [
+    # Archived static AGS group list retained for backward compatibility.
+    ARCHIVED_TABLES = [
         "proj",
         "loca",
         "samp",
@@ -147,7 +146,16 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
         "wadd",
         "wgpg",
         "wgpt",
+        "lden",
+        "lhvn",
+        "lpen",
+        "lvan",
+        "pipe",
+        "rden",
+        "rplt",
+        "rucs",
     ]
+    TABLES = ARCHIVED_TABLES
 
     # ================================================================ #
     # QGIS Algorithm Metadata                                            #
@@ -313,21 +321,14 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
         exporter = CSVExporter(output_dir, append_mode=append_mode)
 
         # ---- Step 6: Transform & Export Each Table ---- #
-        # Loop through all supported AGS groups, transform schema, write CSV
-        for table in self.TABLES:
+        # Dynamically export all AGS groups discovered in the file.
+        tables = transformer.available_tables()
+        for table in tables:
             if feedback.isCanceled():
                 return {}
 
-            # Get transformer method for this group
-            method_name = f"transform_{table}"
-            transform_method = getattr(transformer, method_name, None)
-            if transform_method is None:
-                raise QgsProcessingException(
-                    self.tr(f"Missing transformer method: {method_name}")
-                )
-
-            # Transform group DataFrame (inject columns, reindex to schema)
-            df = transform_method()
+            # Transform group DataFrame using best-effort dynamic logic.
+            df = transformer.transform_table(table)
             
             # Write to CSV with dedup/append logic
             exporter.write(table, df, source_file)

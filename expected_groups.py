@@ -4,7 +4,8 @@
 
 COMMON_FILTER_COLUMNS = ["LOCA_CLST", "LOCA_TYPE", "GEOL_LEG", "GEOL_GEO2", "GEOL_GEOL"]
 
-EXPECTED_CSVS = {
+# Archived static schema map retained for backward compatibility.
+ARCHIVED_EXPECTED_CSVS = {
 
     # ------------------------------------------------------------------ #
     # Meta / manifest (plugin-generated, not from AGS groups)             #
@@ -18,7 +19,7 @@ EXPECTED_CSVS = {
 
     "proj": [
         "source_file", "data_desc", "PROJ_ID", "PROJ_NAME", "PROJ_LOC", "PROJ_CLNT",
-        "PROJ_CONT", "PROJ_ENG", "PROJ_MEMO",
+        "PROJ_CONT", "PROJ_ENG", "PROJ_MEMO", "PROJ_OFFC",
     ],
 
     "manifest": [
@@ -37,8 +38,9 @@ EXPECTED_CSVS = {
         "LOCA_LOCY", "LOCA_LOCZ", "LOCA_LREF", "LOCA_DATM", "LOCA_ETRV",
         "LOCA_NTRV", "LOCA_LTRV", "LOCA_XTRL", "LOCA_YTRL", "LOCA_ZTRL",
         "LOCA_LAT", "LOCA_LON", "LOCA_ELAT", "LOCA_ELON", "LOCA_LLZ",
+        "LOCA_ZDTM", "LOCA_WDEP",
         "LOCA_LOCM", "LOCA_LOCA", "LOCA_CLST", "LOCA_ALID", "LOCA_OFFS",
-        "LOCA_CNGE", "LOCA_TRAN",
+        "LOCA_CNGE", "LOCA_TRAN", "LOCA_CHKG", "LOCA_APPG",
         "lat", "lon",  # derived WGS84 columns added by plugin
     ],
 
@@ -289,7 +291,7 @@ EXPECTED_CSVS = {
         "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
         "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH", "CMPG_TESN", "SPEC_PREP", "SPEC_DESC",
         "CMPG_TYPE", "CMPG_MOLD", "CMPG_375", "CMPG_200", "CMPG_PDEN",
-        "CMPG_MAXD", "CMPG_MCOP", "CMPG_STAB", "CMPG_STYP",
+        "CMPG_MAXD", "CMPG_MCOP", "CMPG_STAB", "CMPG_STYP", "CMPG_SIZ1", "CMPG_SIZ2",
         "CMPG_REM", "CMPG_METH", "CMPG_LAB", "CMPG_CRED", "TEST_STAT",
     ],
 
@@ -401,6 +403,72 @@ EXPECTED_CSVS = {
         "LPDN_CRED", "TEST_STAT",
     ],
 
+    "lden": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH",
+        "LDEN_MC", "LDEN_BDEN", "LDEN_DDEN", "LDEN_LAB",
+    ],
+
+    "lhvn": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH",
+        "LHVN_VNPK", "LHVN_LAB",
+    ],
+
+    "lpen": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH",
+        "LPEN_PPEN", "LPEN_LAB",
+    ],
+
+    "lvan": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH",
+        "LVAN_VNPK", "LVAN_VNRM", "LVAN_LAB",
+    ],
+
+    "rplt": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH", "SPEC_DESC", "SPEC_PREP",
+        "RPLT_PLS", "RPLT_PLSI", "RPLT_PLTF", "RPLT_MC", "RPLT_REM",
+        "RPLT_METH", "RPLT_LAB", "RPLT_CRED", "TEST_STAT",
+    ],
+
+    "rucs": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH", "SPEC_DESC", "SPEC_PREP",
+        "RUCS_SDIA", "RUCS_LEN", "RUCS_MC", "RUCS_COND", "RUCS_DURN", "RUCS_STRA",
+        "RUCS_UCS", "RUCS_MODE", "RUCS_E", "RUCS_MU", "RUCS_ESTR", "RUCS_ETYP",
+        "RUCS_MACH", "RUCS_REM", "RUCS_METH", "RUCS_LAB", "RUCS_CRED", "TEST_STAT",
+    ],
+
+    "pipe": [
+        "source_file",
+        "LOCA_ID", "PIPE_REF", "PIPE_TOP", "ELEV_PIPE_TOP", "PIPE_BASE", "ELEV_PIPE_BASE",
+        "PIPE_DIAM", "PIPE_TYPE", "PIPE_CONS", "PIPE_REM",
+    ],
+
+    "rden": [
+        "samp_id",  # derived
+        "source_file",
+        "LOCA_ID", "SAMP_TOP", "ELEV_SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID",
+        "SPEC_REF", "SPEC_DPTH", "ELEV_SPEC_DPTH", "SPEC_DESC", "SPEC_PREP",
+        "RDEN_MC", "RDEN_SMC", "RDEN_BDEN", "RDEN_DDEN", "RDEN_PORO", "RDEN_PDEN",
+        "RDEN_TEMP", "RDEN_REM", "RDEN_METH", "RDEN_LAB", "RDEN_CRED", "TEST_STAT",
+    ],
+
     # ------------------------------------------------------------------ #
     # Additional tables with depth measurements (stub stubs with ELEV_*)  #
     # ------------------------------------------------------------------ #
@@ -451,7 +519,8 @@ EXPECTED_CSVS = {
 
     "flsh": [
         "source_file",
-        "LOCA_ID", "FLSH_TOP", "ELEV_FLSH_TOP", "FLSH_BASE", "ELEV_FLSH_BASE", "FLSH_DESC", "FLSH_REM",
+        "LOCA_ID", "FLSH_TOP", "ELEV_FLSH_TOP", "FLSH_BASE", "ELEV_FLSH_BASE", "FLSH_TYPE",
+        "FLSH_RETN", "FLSH_RETX", "FLSH_COL", "FLSH_REM",
     ],
 
     "hdia": [
@@ -461,7 +530,8 @@ EXPECTED_CSVS = {
 
     "horn": [
         "source_file",
-        "LOCA_ID", "HORN_TOP", "ELEV_HORN_TOP", "HORN_BASE", "ELEV_HORN_BASE", "HORN_DESC", "HORN_REM",
+        "LOCA_ID", "HORN_TOP", "ELEV_HORN_TOP", "HORN_BASE", "ELEV_HORN_BASE", "HORN_ORNT",
+        "HORN_INCL", "HORN_REM",
     ],
 
     "iden": [
@@ -558,9 +628,12 @@ EXPECTED_CSVS = {
 
 # Append shared filter columns to all tables (except meta/manifest) so Power BI
 # users can filter any table by location cluster, location type, or geology legend.
-for _table, _cols in EXPECTED_CSVS.items():
+for _table, _cols in ARCHIVED_EXPECTED_CSVS.items():
     if _table in {"meta", "manifest", "proj"}:
         continue
     for _col in COMMON_FILTER_COLUMNS:
         if _col not in _cols:
             _cols.append(_col)
+
+# Compatibility alias for existing imports.
+EXPECTED_CSVS = ARCHIVED_EXPECTED_CSVS

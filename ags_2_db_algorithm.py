@@ -590,31 +590,16 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 				transformer = AGSTransformer(parser, source_file, data_desc=data_desc)
 				exporter = CSVExporter(csv_output_dir, append_mode=append_mode)
 				
-				# Tables to export (from ags_2_csv.py TABLES list)
-				tables = [
-					"proj", "loca", "samp", "bkfl", "geol", "detl", "ispt", "core", "weth", "frac",
-					"hdph", "wins", "wstg", "wstd", "mong", "mond", "dcpg", "dcpt", "dprg", "icbr",
-					"ipid", "ivan", "chis", "ptim", "lpdn", "llpl", "grat", "grag", "mcvg", "lnmc",
-					"mcvt", "cbrg", "cbrt", "cmpg", "cmpt", "cong", "cons", "shbg", "shbt", "trig",
-					"trit", "gchm", "eres",
-					"spec", "cdia", "disc", "dlog", "dobs", "dprb", "drem", "fghg", "flsh", "hdia",
-					"horn", "iden", "ifid", "ipen", "iprg", "iprt", "irdx", "ires", "isag", "isat",
-					"pltg", "pmtg", "pumt", "scdg", "scpp", "scpt", "wadd", "wgpg", "wgpt"
-				]
+				# Dynamically discover all exportable groups from the AGS file.
+				tables = transformer.available_tables()
 				
 				for table in tables:
 					if feedback.isCanceled():
 						feedback.pushInfo("CSV export cancelled by user.")
 						break
 					
-					method_name = f"transform_{table}"
-					transform_method = getattr(transformer, method_name, None)
-					if transform_method is None:
-						feedback.pushInfo(f"Skipping {table}: no transform method")
-						continue
-					
 					try:
-						df = transform_method()
+						df = transformer.transform_table(table)
 						exporter.write(table, df, source_file)
 						feedback.pushInfo(f"Wrote {table}.csv ({len(df)} rows)")
 					except Exception as e:

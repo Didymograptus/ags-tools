@@ -11,6 +11,8 @@ from ..expected_groups import EXPECTED_CSVS
 
 
 class AGSTransformer:
+    SKIP_GROUPS = {"ABBR", "DICT", "TRAN", "TYPE", "UNIT"}
+
     # Map table names to lists of depth columns that should get ELEV_* columns calculated
     # Multiple depth columns per table = multiple ELEV_* columns
     ELEVATION_DEPTH_COLUMNS = {
@@ -49,14 +51,22 @@ class AGSTransformer:
         "ispt": ["ISPT_TOP", "ISPT_CAS"],
         "ivan": ["IVAN_DPTH"],
         "loca": ["LOCA_FDEP"],
+        "pipe": ["PIPE_TOP", "PIPE_BASE"],
         "pltg": ["PLTG_DPTH"],
         "pmtg": ["PMTG_DPTH"],
         "ptim": ["PTIM_DPTH", "PTIM_CAS"],
         "pumt": ["PUMT_DPTH"],
+        "rden": ["SAMP_TOP", "SPEC_DPTH"],
+        "rplt": ["SAMP_TOP", "SPEC_DPTH"],
+        "rucs": ["SAMP_TOP", "SPEC_DPTH"],
         "scdg": ["SCDG_DPTH"],
         "scpp": ["SCPP_TOP", "SCPP_BASE"],
         "scpt": ["SCPT_DPTH"],
         "wadd": ["WADD_TOP", "WADD_BASE"],
+        "lden": ["SAMP_TOP", "SPEC_DPTH"],
+        "lhvn": ["SAMP_TOP", "SPEC_DPTH"],
+        "lpen": ["SAMP_TOP", "SPEC_DPTH"],
+        "lvan": ["SAMP_TOP", "SPEC_DPTH"],
         "weth": ["WETH_TOP", "WETH_BASE"],
         "wgpg": ["WGPG_STRT", "WGPG_STOP", "WGPG_BHD"],
         "wgpt": ["WGPT_DPTH"],
@@ -89,6 +99,10 @@ class AGSTransformer:
         "mcvg": "SAMP_TOP",
         "lnmc": "SAMP_TOP",
         "mcvt": "SAMP_TOP",
+        "lden": "SAMP_TOP",
+        "lhvn": "SAMP_TOP",
+        "lpen": "SAMP_TOP",
+        "lvan": "SAMP_TOP",
         "cbrg": "SAMP_TOP",
         "cbrt": "SAMP_TOP",
         "cmpg": "SAMP_TOP",
@@ -99,6 +113,9 @@ class AGSTransformer:
         "shbt": "SAMP_TOP",
         "trig": "SAMP_TOP",
         "trit": "SAMP_TOP",
+        "rden": "SAMP_TOP",
+        "rplt": "SAMP_TOP",
+        "rucs": "SAMP_TOP",
         "gchm": "SAMP_TOP",
         "eres": "SAMP_TOP",
     }
@@ -356,6 +373,64 @@ class AGSTransformer:
             + "_"
             + df.get("SAMP_TOP", pd.Series([""] * len(df))).astype(str)
         )
+
+    def available_tables(self) -> list:
+        """Return exportable AGS groups discovered in the loaded file, in file order."""
+        tables = []
+        for group_name, df in self.parser.tables.items():
+            if group_name in self.SKIP_GROUPS:
+                continue
+            if df is None:
+                continue
+            tables.append(group_name.lower())
+        return tables
+
+    def transform_table(self, table_name: str) -> pd.DataFrame:
+        """
+        Dynamically transform any AGS table from the loaded file.
+        Uses AGS-native headers and applies optional plugin enrichments.
+        Missing prerequisite columns for enrichments are ignored safely.
+        """
+        table_key = table_name.lower()
+        df = self.parser.get_group(table_key.upper())
+        if df is None:
+            return pd.DataFrame(columns=["source_file"])
+
+        out = df.copy()
+        out.drop(columns=[c for c in ["FILE_FSET"] if c in out.columns], inplace=True)
+
+        if "source_file" in out.columns:
+            out["source_file"] = out["source_file"].where(
+                out["source_file"].notna(), self.source_file
+            )
+        else:
+            out.insert(0, "source_file", self.source_file)
+
+        # Derive samp_id when sample-link key columns are present.
+        if (
+            "samp_id" not in out.columns
+            and {"LOCA_ID", "SAMP_REF", "SAMP_TOP"}.issubset(out.columns)
+        ):
+            out.insert(0, "samp_id", self._samp_id_series(out))
+
+        # Preserve data description in PROJ exports when provided by the user.
+        if table_key == "proj" and self.data_desc and "data_desc" not in out.columns:
+            out.insert(1, "data_desc", self.data_desc)
+
+        # Keep legacy lat/lon enrichment for LOCA when coordinate columns are present.
+        if table_key == "loca" and "lat" not in out.columns and "lon" not in out.columns:
+            lats, lons = [], []
+            for _, r in out.iterrows():
+                e = self._safe_float(r.get("LOCA_NATE"))
+                n = self._safe_float(r.get("LOCA_NATN"))
+                lat, lon = bng_to_wgs84(e, n) if (e and n) else (None, None)
+                lats.append(lat)
+                lons.append(lon)
+            out["lat"] = lats
+            out["lon"] = lons
+
+        out = self._inject_elevation(out, table_key)
+        return self._inject_filter_columns(out, table_key)
 
     def transform_proj(self) -> pd.DataFrame:
         df = self.parser.get_group("PROJ")
@@ -892,4 +967,73 @@ class AGSTransformer:
         if df is None:
             return self._empty_df("wgpt")
         return self._pass_through(df, "wgpt")
+
+    def transform_lden(self) -> pd.DataFrame:
+        df = self.parser.get_group("LDEN")
+        if df is None:
+            return self._empty_df("lden")
+        return self._pass_through(
+            df, "lden",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_lhvn(self) -> pd.DataFrame:
+        df = self.parser.get_group("LHVN")
+        if df is None:
+            return self._empty_df("lhvn")
+        return self._pass_through(
+            df, "lhvn",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_lpen(self) -> pd.DataFrame:
+        df = self.parser.get_group("LPEN")
+        if df is None:
+            return self._empty_df("lpen")
+        return self._pass_through(
+            df, "lpen",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_lvan(self) -> pd.DataFrame:
+        df = self.parser.get_group("LVAN")
+        if df is None:
+            return self._empty_df("lvan")
+        return self._pass_through(
+            df, "lvan",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_pipe(self) -> pd.DataFrame:
+        df = self.parser.get_group("PIPE")
+        if df is None:
+            return self._empty_df("pipe")
+        return self._pass_through(df, "pipe")
+
+    def transform_rden(self) -> pd.DataFrame:
+        df = self.parser.get_group("RDEN")
+        if df is None:
+            return self._empty_df("rden")
+        return self._pass_through(
+            df, "rden",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_rplt(self) -> pd.DataFrame:
+        df = self.parser.get_group("RPLT")
+        if df is None:
+            return self._empty_df("rplt")
+        return self._pass_through(
+            df, "rplt",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
+
+    def transform_rucs(self) -> pd.DataFrame:
+        df = self.parser.get_group("RUCS")
+        if df is None:
+            return self._empty_df("rucs")
+        return self._pass_through(
+            df, "rucs",
+            extra_cols={"samp_id": self._samp_id_series(df)},
+        )
 
