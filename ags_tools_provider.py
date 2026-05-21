@@ -31,6 +31,7 @@ __copyright__ = '(C) 2023 by Oliver Burdekin / burdGIS'
 __revision__ = '$Format:%H$'
 
 from qgis.core import QgsProcessingProvider
+from .ags_2_csv import AGS2CSVAlgorithm
 from .ags_2_db_algorithm import AGS2DBAlgorithm
 from .ags_validator import AGSValidatorAlgorithm
 from .db_2_csv_algorithm import DB2CSVAlgorithm
@@ -55,6 +56,7 @@ class AGSToolsProvider(QgsProcessingProvider):
         """
         Loads all algorithms belonging to this provider.
         """
+        self.addAlgorithm(AGS2CSVAlgorithm())
         self.addAlgorithm(AGS2DBAlgorithm())
         self.addAlgorithm(AGSValidatorAlgorithm())
         self.addAlgorithm(DB2CSVAlgorithm())

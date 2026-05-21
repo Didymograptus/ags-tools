@@ -128,31 +128,6 @@ def _list_db_tables(db_path: str) -> list:
         return []
 
 
-def _first_non_empty_from_series(series: pd.Series) -> str:
-    for value in series:
-        text = str(value or '').strip()
-        if text:
-            return text
-    return ''
-
-
-def _get_project_id_from_db(db_path: str) -> str:
-    """Get first non-empty PROJ_ID from PROJ table, if present."""
-    proj_layer = QgsVectorLayer(f'{db_path}|layername=PROJ', 'PROJ', 'ogr')
-    if not proj_layer.isValid():
-        return ''
-
-    fields = [field.name() for field in proj_layer.fields()]
-    if 'PROJ_ID' not in fields:
-        return ''
-
-    for feature in proj_layer.getFeatures():
-        proj_id = str(feature['PROJ_ID'] or '').strip()
-        if proj_id:
-            return proj_id
-    return ''
-
-
 def _ensure_provenance_columns(
     df: pd.DataFrame,
     csv_folder_name: str,
@@ -178,8 +153,9 @@ def _ensure_provenance_columns(
     else:
         # Append csv_folder_name to existing source_file for full lineage
         source_values = out['source_file'].fillna('').astype(str).str.strip()
+        suffix = f"|{csv_folder_name}"
         out['source_file'] = source_values.apply(
-            lambda x: f"{x}|{csv_folder_name}" if x else csv_folder_name
+            lambda x: x if x.endswith(suffix) else (f"{x}{suffix}" if x else csv_folder_name)
         )
     
     return out
@@ -334,7 +310,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
                          'virts_geometry_columns', 'ElementaryGeometries')
         tables_to_export = [
             t for t in table_names
-            if not any(t.lower().startswith(p.lower()) for p in skip_prefixes)
+            if not any(t.lower().startswith(p) for p in skip_prefixes)
         ]
 
         feedback.pushInfo(
@@ -346,6 +322,9 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
         # CSVExporter handles deduplication and append logic
         exporter = CSVExporter(csv_output_dir, append_mode=append_mode)
         db_name = os.path.basename(db_path)
+        
+        # Note: Future enhancement could enrich tables with elevation/filter columns
+        # using transformer.enrich_dataframe() if LOCA/GEOL tables are present in DB
         
         # ---- Step 5: Determine Folder Name for Lineage ---- #
         # Use provided folder_name, or fall back to output directory basename
@@ -430,7 +409,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
 
     def groupId(self):
         """Internal group identifier."""
-        return ''
+        return 'agstools'
 
     def tr(self, string):
         """Translate string for QGIS UI."""

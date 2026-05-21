@@ -42,7 +42,6 @@ from qgis.core import (QgsApplication,
 					   QgsProcessingParameterCrs,
 					   QgsCoordinateReferenceSystem,
 					   QgsVectorLayer,
-					   QgsVectorLayer,
 					   QgsField,
 					   QgsFields,
 					   QgsFeature,
@@ -60,16 +59,17 @@ from qgis.utils import iface
 from io import StringIO
 # import sqlite3
 import os
+import pandas as pd
 from pathlib import Path
 
 if __package__:
 	from .core.parser import AGSParser
 	from .core.transformer import AGSTransformer
-	from .core.exporter import CSVExporter
+	from .core.csv_pipeline import export_ags_to_csv
 else:
 	from core.parser import AGSParser
 	from core.transformer import AGSTransformer
-	from core.exporter import CSVExporter
+	from core.csv_pipeline import export_ags_to_csv
 
 
 class AGS2DBAlgorithm(QgsProcessingAlgorithm):
@@ -84,7 +84,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 	All Processing algorithms should extend the QgsProcessingAlgorithm
 	class.
-	"""
+	 """
 
 	# Constants used to refer to parameters and outputs. They will be
 	# used when calling the algorithm from another algorithm, or when
@@ -110,7 +110,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 		self.addParameter(
 			QgsProcessingParameterFile(
 				self.INPUT,
-				self.tr('Input AGS file(s)'),
+				self.tr('Input AGS file(s) (e.g., .ags format)'),
 				
 			)
 		)
@@ -127,7 +127,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 		self.addParameter(
 			QgsProcessingParameterFileDestination(
 				self.OUTPUT,
-				self.tr('Output Database File'),
+				self.tr('Output Database File (GeoPackage or SpatiaLite)'),
 				fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)'
 				
 			)
@@ -152,7 +152,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 		csv_output_dir_param = QgsProcessingParameterFile(
 			self.CSV_OUTPUT_DIR,
-			self.tr('Output CSV Database Folder (existing or new)'),
+			self.tr('Parent folder for CSV exports (existing or new)'),
 			behavior=QgsProcessingParameterFile.Folder,
 			optional=True
 		)
@@ -166,7 +166,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 		csv_output_folder_name_param = QgsProcessingParameterString(
 			self.CSV_OUTPUT_FOLDER_NAME,
-			self.tr('Folder name of CSV database (leave blank if appending to existing folder)'),
+			self.tr('Subfolder name for CSV exports (leave blank to append to parent folder)'),
 			defaultValue='',
 			optional=True
 		)
@@ -180,7 +180,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 		csv_append_param = QgsProcessingParameterBoolean(
 			self.CSV_APPEND_MODE,
-			self.tr('Append to existing CSV files'),
+			self.tr('Append to existing CSV files (if present)'),
 			defaultValue=False,
 			optional=True
 		)
@@ -274,7 +274,9 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 				for record in records:
 					x_val = record.get(x_field)
 					y_val = record.get(y_field)
-					if x_val and x_val.strip() != '' and y_val and y_val.strip() != '':
+					x_ok = (x_val is not None) and (not isinstance(x_val, str) or x_val.strip() != '')
+					y_ok = (y_val is not None) and (not isinstance(y_val, str) or y_val.strip() != '')
+					if x_ok and y_ok:
 						has_data = True
 						break
 
@@ -314,17 +316,19 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 			for header, ftype in column_types['LOCA'].items():
 				val = record.get(header)
 				if ftype == "REAL":
-					if val is None or val.strip() == '':
+					if val is None or (isinstance(val, str) and val.strip() == ''):
 						attrs.append(None)
 					else:
-						attrs.append(float(val))
+						attrs.append(round(float(val), 2))
 				else:
 					attrs.append(val if val is not None else None)
 
 			# Attempt to get coordinates
 			x_val = record.get(x_field)
 			y_val = record.get(y_field)
-			if x_val is None or x_val.strip() == '' or y_val is None or y_val.strip() == '':
+			x_missing = x_val is None or (isinstance(x_val, str) and x_val.strip() == '')
+			y_missing = y_val is None or (isinstance(y_val, str) and y_val.strip() == '')
+			if x_missing or y_missing:
 				# No coordinates for this feature
 				feedback.pushInfo(f"LOCA feature missing coordinates: {record}")
 				# We still add the feature but without geometry
@@ -357,6 +361,13 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 			feedback.reportError("No LOCA features had valid coordinates. The LOCA layer will have no geometries.")
 
 		return layer
+
+	def _infer_column_types_from_df(self, df):
+		"""Infer QGIS field types from pandas DataFrame dtypes."""
+		column_types = {}
+		for col in df.columns:
+			column_types[col] = "REAL" if pd.api.types.is_numeric_dtype(df[col]) else "TEXT"
+		return column_types
 
 	def create_database_connection(self, output_path, feedback):
 		# Only works for gpkg
@@ -414,54 +425,48 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 			os.remove(output_path)
 			feedback.pushInfo(f"Removed existing GeoPackage at: {output_path}")
 
-		# Load AGS4 file contents
+		# Load AGS4 file path
 		ags_file_path = self.parameterAsFile(parameters, self.INPUT, context)
-		with open(ags_file_path, 'r') as ags_file:
-			file_contents = ags_file.read()
 
 		# Get chosen CRS
 		crs = self.parameterAsCrs(parameters, self.CRS, context)
 		data_desc = self.parameterAsString(parameters, self.DATA_DESC, context)
 		data_desc = (data_desc or '').strip()
 
-		# Parse the AGS file
-		data, column_types = self.parse_ags_file(file_contents)
+		# Parse the AGS file using unified parser
+		parser = AGSParser(ags_file_path)
+		parser.load()
 
 		ags_filename = Path(ags_file_path).name
 		db_filename = Path(output_path).name
 		proj_id = ''
-		if 'PROJ' in data:
-			for record in data['PROJ']:
-				proj_val = str(record.get('PROJ_ID', '') or '').strip()
-				if proj_val:
-					proj_id = proj_val
-					break
+		proj_df = parser.get_group("PROJ")
+		if proj_df is not None and 'PROJ_ID' in proj_df.columns:
+			proj_vals = proj_df['PROJ_ID'].dropna().astype(str).str.strip()
+			proj_vals = proj_vals[proj_vals != '']
+			if len(proj_vals) > 0:
+				proj_id = proj_vals.iloc[0]
 		
 		# For AGS2DB, source_file format: ags_filename|db_filename|project_id
 		# This provides full traceability: where data came from (AGS), where it went (DB), and what project
 		source_file_value = f"{ags_filename}|{db_filename}|{proj_id}" if proj_id else f"{ags_filename}|{db_filename}"
 
-		# Ensure provenance fields exist across all DB tables
-		for group_name, records in data.items():
-			if group_name.endswith("_units"):
-				continue
-			column_types.setdefault(group_name, {})['source_file'] = 'TEXT'
-			for record in records:
-				if not str(record.get('source_file', '') or '').strip():
-					record['source_file'] = source_file_value
-
-		# Inject user-supplied description into PROJ records for DB output.
-		if 'PROJ' in data:
-			for record in data['PROJ']:
-				record['data_desc'] = data_desc
-			column_types.setdefault('PROJ', {})['data_desc'] = 'TEXT'
+		# Build transformer so AGS->DB has the same injected/calculated columns as AGS->CSV.
+		transformer = AGSTransformer(parser, source_file_value)
+		tables_to_write = {}
+		for group_name in transformer.available_tables():
+			df = transformer.transform_table(group_name)
+			if group_name == "PROJ":
+				df = df.copy()
+				df['data_desc'] = data_desc
+			tables_to_write[group_name] = df
 
 		first_layer = True
 		transform_context = context.transformContext()
 
-		for group_name, records in data.items():
-			if group_name.endswith("_units"):
-				continue  # Skip unit tables
+		for group_name, df in tables_to_write.items():
+			records = df.to_dict('records')
+			column_types = {group_name: self._infer_column_types_from_df(df)}
 
 			feedback.pushInfo(f"Processing group: {group_name}")
 
@@ -489,10 +494,10 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 					for header, ftype in column_types[group_name].items():
 						val = record.get(header)
 						if ftype == "REAL":
-							if val is None or val.strip() == '':
+							if val is None or (isinstance(val, str) and val.strip() == ''):
 								attrs.append(None)
 							else:
-								attrs.append(float(val))
+								attrs.append(round(float(val), 2))
 						else:
 							attrs.append(val if val is not None else None)
 					feature.setAttributes(attrs)
@@ -501,7 +506,6 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
 			# Export layer
 			options = QgsVectorFileWriter.SaveVectorOptions()
-			options.driverName = "GPKG"
 			if ext == '.gpkg':
 				options.driverName = "GPKG"
 			elif ext == '.sqlite':
@@ -580,45 +584,19 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 			feedback.pushInfo(f"Exporting AGS to CSV folder: {csv_output_dir}")
 			
 			try:
-				# Parse AGS file
-				parser = AGSParser(ags_file_path)
-				parser.load()
 				feedback.pushInfo("AGS file loaded for CSV export")
 				
-				# Transform and export
-				source_file = Path(ags_file_path).name
-				transformer = AGSTransformer(parser, source_file, data_desc=data_desc)
-				exporter = CSVExporter(csv_output_dir, append_mode=append_mode)
+				source_file = f"{ags_filename}|{os.path.basename(csv_output_dir)}|{proj_id}" if proj_id else f"{ags_filename}|{os.path.basename(csv_output_dir)}"
 				
-				# Dynamically discover all exportable groups from the AGS file.
-				tables = transformer.available_tables()
-				
-				for table in tables:
-					if feedback.isCanceled():
-						feedback.pushInfo("CSV export cancelled by user.")
-						break
-					
-					try:
-						df = transformer.transform_table(table)
-						exporter.write(table, df, source_file)
-						feedback.pushInfo(f"Wrote {table}.csv ({len(df)} rows)")
-					except Exception as e:
-						feedback.reportError(f"Error transforming {table}: {str(e)}")
-				
-				exporter.write_manifest()
-				feedback.pushInfo("CSV export complete - wrote manifest.csv")
+				# Build transformer and export using unified pipeline
+				transformer = AGSTransformer(parser, source_file)
+				export_ags_to_csv(transformer, csv_output_dir, append_mode=append_mode, feedback=feedback)
 				
 			except Exception as e:
 				feedback.reportError(f"CSV export failed: {str(e)}")
 
 		return {self.OUTPUT: output_path}
 	
-	def processing_log(self, message):
-		"""
-		Logs a message to the Processing log.
-		"""
-		self.logMessage(message)
-
 	def name(self):
 		"""
 		Returns the algorithm name, used for identifying the algorithm. This
@@ -651,7 +629,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 		contain lowercase alphanumeric characters only and no spaces or other
 		formatting characters.
 		"""
-		return ''
+		return 'agstools'
 
 	def tr(self, string):
 		return QCoreApplication.translate('Processing', string)

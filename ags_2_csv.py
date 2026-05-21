@@ -11,10 +11,8 @@ Workflow:
   1. Load .ags file using python-ags4
   2. Extract PROJ_ID for data lineage tracking
   3. Build transformer with geometry lookups (LOCA_GL, intervals, etc.)
-  4. For each supported AGS group:
-     - Call transform_<group>() to produce output schema
-     - Inject elevation calculations (ELEV_* columns)
-     - Reindex to fixed column order
+  4. For each AGS group:
+     - Call transform_table() to inject source_file, samp_id, ELEV_*, filter columns
   5. Write group to CSV file with deduplication/append logic
   6. Write manifest.csv with row counts and timestamps
 
@@ -25,7 +23,6 @@ Deduplication: Prefix-match on first 3 pipe parts prevents duplicates on re-expo
 import os
 from pathlib import Path
 
-import pandas as pd
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.core import (
@@ -41,11 +38,11 @@ from qgis.core import (
 if __package__:
     from .core.parser import AGSParser
     from .core.transformer import AGSTransformer
-    from .core.exporter import CSVExporter
+    from .core.csv_pipeline import export_ags_to_csv
 else:
     from core.parser import AGSParser
     from core.transformer import AGSTransformer
-    from core.exporter import CSVExporter
+    from core.csv_pipeline import export_ags_to_csv
 
 
 class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
@@ -62,8 +59,8 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
       1. Validate inputs (file exists, paths valid)
       2. Determine append_mode (prompt user if folder exists)
       3. Build AGSTransformer with lookups from LOCA/GEOL groups
-      4. Loop through TABLES list, transform and write each
-      5. Write manifest.csv with export metadata
+      4. Transform each group and write to CSV
+      5. Write manifest.csv
     """
     
     # Parameter keys for QGIS Processing framework
@@ -71,91 +68,6 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     OUTPUT_DIR = "OUTPUT_DIR"
     OUTPUT_FOLDER_NAME = "OUTPUT_FOLDER_NAME"
     ALLOW_APPEND = "ALLOW_APPEND"
-
-    # Archived static AGS group list retained for backward compatibility.
-    ARCHIVED_TABLES = [
-        "proj",
-        "loca",
-        "samp",
-        "bkfl",
-        "geol",
-        "detl",
-        "ispt",
-        "core",
-        "weth",
-        "frac",
-        "hdph",
-        "wins",
-        "wstg",
-        "wstd",
-        "mong",
-        "mond",
-        "dcpg",
-        "dcpt",
-        "dprg",
-        "icbr",
-        "ipid",
-        "ivan",
-        "chis",
-        "ptim",
-        "lpdn",
-        "llpl",
-        "grat",
-        "grag",
-        "mcvg",
-        "lnmc",
-        "mcvt",
-        "cbrg",
-        "cbrt",
-        "cmpg",
-        "cmpt",
-        "cong",
-        "cons",
-        "shbg",
-        "shbt",
-        "trig",
-        "trit",
-        "gchm",
-        "eres",
-        "spec",
-        "cdia",
-        "disc",
-        "dlog",
-        "dobs",
-        "dprb",
-        "drem",
-        "fghg",
-        "flsh",
-        "hdia",
-        "horn",
-        "iden",
-        "ifid",
-        "ipen",
-        "iprg",
-        "iprt",
-        "irdx",
-        "ires",
-        "isag",
-        "isat",
-        "pltg",
-        "pmtg",
-        "pumt",
-        "scdg",
-        "scpp",
-        "scpt",
-        "wadd",
-        "wgpg",
-        "wgpt",
-        "lden",
-        "lhvn",
-        "lpen",
-        "lvan",
-        "pipe",
-        "rden",
-        "rplt",
-        "rucs",
-    ]
-    TABLES = ARCHIVED_TABLES
 
     # ================================================================ #
     # QGIS Algorithm Metadata                                            #
@@ -315,28 +227,11 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
 
         # ---- Step 5: Build Transformer & Exporter ---- #
         # Transformer reads lookups (LOCA, GEOL) and builds mappings
-        # Exporter handles CSV write + deduplication logic
         feedback.pushInfo(self.tr("Transforming AGS groups..."))
         transformer = AGSTransformer(parser, source_file)
-        exporter = CSVExporter(output_dir, append_mode=append_mode)
 
-        # ---- Step 6: Transform & Export Each Table ---- #
-        # Dynamically export all AGS groups discovered in the file.
-        tables = transformer.available_tables()
-        for table in tables:
-            if feedback.isCanceled():
-                return {}
-
-            # Transform group DataFrame using best-effort dynamic logic.
-            df = transformer.transform_table(table)
-            
-            # Write to CSV with dedup/append logic
-            exporter.write(table, df, source_file)
-            feedback.pushInfo(self.tr(f"Wrote {table}.csv ({len(df)} rows)"))
-
-        # ---- Step 7: Write Manifest ---- #
-        # Manifest tracks which tables were exported, row counts, timestamps
-        exporter.write_manifest()
-        feedback.pushInfo(self.tr("Wrote manifest.csv"))
+        # ---- Step 6: Export All Tables to CSV ---- #
+        # Use unified CSV pipeline for consistent behavior
+        export_ags_to_csv(transformer, output_dir, append_mode=append_mode, feedback=feedback)
 
         return {self.OUTPUT_DIR: output_dir}

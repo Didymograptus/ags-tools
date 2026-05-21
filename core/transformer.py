@@ -5,174 +5,42 @@
 # Power BI relationships and column references never break across files.
 
 import pandas as pd
-from datetime import datetime
 from .geo_utils import bng_to_wgs84
-from ..expected_groups import EXPECTED_CSVS
+from ..expected_groups import (
+    GROUPS_WITH_SAMP_ID,
+    ELEVATION_DEPTH_COLUMNS,
+    GEOLOGY_INTERVAL_DEPTH_COLUMNS,
+)
 
 
 class AGSTransformer:
-    SKIP_GROUPS = {"ABBR", "DICT", "TRAN", "TYPE", "UNIT"}
+    # All constants imported from expected_groups as the single source of truth
+    ELEVATION_DEPTH_COLUMNS = ELEVATION_DEPTH_COLUMNS
+    GROUPS_WITH_SAMP_ID = GROUPS_WITH_SAMP_ID
+    GEOLOGY_INTERVAL_DEPTH_COLUMNS = GEOLOGY_INTERVAL_DEPTH_COLUMNS
 
-    # Map table names to lists of depth columns that should get ELEV_* columns calculated
-    # Multiple depth columns per table = multiple ELEV_* columns
-    ELEVATION_DEPTH_COLUMNS = {
-        "samp": ["SAMP_TOP", "SAMP_BASE", "SAMP_WDEP"],
-        "spec": ["SPEC_DPTH", "SPEC_BASE"],
-        "bkfl": ["BKFL_TOP", "BKFL_BASE"],
-        "cdia": ["CDIA_DPTH"],
-        "chis": ["CHIS_FROM", "CHIS_TO"],
-        "core": ["CORE_TOP", "CORE_BASE"],
-        "dcpg": ["DCPG_DPTH"],
-        "detl": ["DETL_TOP", "DETL_BASE"],
-        "disc": ["DISC_TOP", "DISC_BASE"],
-        "dlog": ["DLOG_TOP", "DLOG_BASE"],
-        "dobs": ["DOBS_TOP", "DOBS_BASE"],
-        "dprb": ["DPRB_DPTH"],
-        "dprg": ["DPRG_TIP"],
-        "drem": ["DREM_TOP", "DREM_BASE"],
-        "fghg": ["FGHG_TOP", "FGHG_BASE", "FGHG_HBAS", "FGHG_CAS", "FGHG_PRWL", "FGHG_AWL"],
-        "flsh": ["FLSH_TOP", "FLSH_BASE"],
-        "frac": ["FRAC_FROM", "FRAC_TO"],
-        "geol": ["GEOL_TOP", "GEOL_BASE"],
-        "hdia": ["HDIA_DPTH"],
-        "hdph": ["HDPH_TOP", "HDPH_BASE"],
-        "horn": ["HORN_TOP", "HORN_BASE"],
-        "icbr": ["ICBR_DPTH"],
-        "iden": ["IDEN_DPTH"],
-        "ifid": ["IFID_DPTH"],
-        "ipen": ["IPEN_DPTH"],
-        "ipid": ["IPID_DPTH"],
-        "iprg": ["IPRG_TOP", "IPRG_BASE", "IPRG_PRWL", "IPRG_SWAL", "IPRG_AWL"],
-        "iprt": ["IPRT_DPTH"],
-        "irdx": ["IRDX_DPTH"],
-        "ires": ["IRES_DPTH", "IRES_BASE"],
-        "isag": ["ISAG_DPTS", "ISAG_DPTE"],
-        "isat": ["ISAT_DPTH"],
-        "ispt": ["ISPT_TOP", "ISPT_CAS"],
-        "ivan": ["IVAN_DPTH"],
-        "loca": ["LOCA_FDEP"],
-        "pipe": ["PIPE_TOP", "PIPE_BASE"],
-        "pltg": ["PLTG_DPTH"],
-        "pmtg": ["PMTG_DPTH"],
-        "ptim": ["PTIM_DPTH", "PTIM_CAS"],
-        "pumt": ["PUMT_DPTH"],
-        "rden": ["SAMP_TOP", "SPEC_DPTH"],
-        "rplt": ["SAMP_TOP", "SPEC_DPTH"],
-        "rucs": ["SAMP_TOP", "SPEC_DPTH"],
-        "scdg": ["SCDG_DPTH"],
-        "scpp": ["SCPP_TOP", "SCPP_BASE"],
-        "scpt": ["SCPT_DPTH"],
-        "wadd": ["WADD_TOP", "WADD_BASE"],
-        "lden": ["SAMP_TOP", "SPEC_DPTH"],
-        "lhvn": ["SAMP_TOP", "SPEC_DPTH"],
-        "lpen": ["SAMP_TOP", "SPEC_DPTH"],
-        "lvan": ["SAMP_TOP", "SPEC_DPTH"],
-        "weth": ["WETH_TOP", "WETH_BASE"],
-        "wgpg": ["WGPG_STRT", "WGPG_STOP", "WGPG_BHD"],
-        "wgpt": ["WGPT_DPTH"],
-        "wstg": ["WSTG_DPTH", "WSTG_SEAL", "WSTG_CAS"],
-        "wstd": ["WSTD_POST"],
-        "wins": ["WINS_TOP"],
-    }
-
-    GEOLOGY_INTERVAL_DEPTH_COLUMNS = {
-        "samp": "SAMP_TOP",
-        "bkfl": "BKFL_TOP",
-        "detl": "DETL_TOP",
-        "weth": "WETH_TOP",
-        "core": "CORE_TOP",
-        "hdph": "HDPH_TOP",
-        "wins": "WINS_TOP",
-        "wstg": "WSTG_DPTH",
-        "wstd": "WSTG_DPTH",
-        "ispt": "ISPT_TOP",
-        "dcpg": "DCPG_DPTH",
-        "dcpt": "DCPG_DPTH",
-        "icbr": "ICBR_DPTH",
-        "ipid": "IPID_DPTH",
-        "ivan": "IVAN_DPTH",
-        "ptim": "PTIM_DPTH",
-        "lpdn": "SAMP_TOP",
-        "llpl": "SAMP_TOP",
-        "grat": "SAMP_TOP",
-        "grag": "SAMP_TOP",
-        "mcvg": "SAMP_TOP",
-        "lnmc": "SAMP_TOP",
-        "mcvt": "SAMP_TOP",
-        "lden": "SAMP_TOP",
-        "lhvn": "SAMP_TOP",
-        "lpen": "SAMP_TOP",
-        "lvan": "SAMP_TOP",
-        "cbrg": "SAMP_TOP",
-        "cbrt": "SAMP_TOP",
-        "cmpg": "SAMP_TOP",
-        "cmpt": "SAMP_TOP",
-        "cong": "SAMP_TOP",
-        "cons": "SAMP_TOP",
-        "shbg": "SAMP_TOP",
-        "shbt": "SAMP_TOP",
-        "trig": "SAMP_TOP",
-        "trit": "SAMP_TOP",
-        "rden": "SAMP_TOP",
-        "rplt": "SAMP_TOP",
-        "rucs": "SAMP_TOP",
-        "gchm": "SAMP_TOP",
-        "eres": "SAMP_TOP",
-    }
-
-    def __init__(self, parser, source_file: str, data_desc: str = ""):
+    def __init__(self, parser, source_file: str):
         self.parser = parser
         self.source_file = source_file
-        self.data_desc = data_desc
-        self.exported_at = datetime.utcnow().isoformat()
         (
-            self.loca_clst_lookup,
-            self.loca_type_lookup,
             self.geol_leg_lookup,
             self.geol_geo2_lookup,
             self.geol_geol_lookup,
             self.loca_gl_lookup,
-        ) = (
-            self._build_filter_lookups()
-        )
+        ) = self._build_filter_lookups()
         self.geol_intervals_lookup = self._build_geol_intervals_lookup()
 
     # ------------------------------------------------------------------ #
-    # Internal helpers                                                     #
-    # ------------------------------------------------------------------ #
 
     def _empty_df(self, table_name: str) -> pd.DataFrame:
-        """Returns an empty DataFrame with the correct column schema."""
-        out = pd.DataFrame(columns=EXPECTED_CSVS[table_name])
-        out = self._inject_elevation(out, table_name)
-        return self._inject_filter_columns(out, table_name)
+        """Returns an empty DataFrame for a group that has no data in the AGS file."""
+        return pd.DataFrame()
 
     def _safe_float(self, val):
         try:
             return float(val)
         except (ValueError, TypeError):
             return None
-
-    def _safe_int(self, val):
-        try:
-            return int(float(val))
-        except (ValueError, TypeError):
-            return None
-
-    def _parse_date(self, val):
-        """Parses AGS date / datetime strings to YYYY-MM-DD."""
-        if not val or (isinstance(val, float)):
-            return None
-        s = str(val).strip()
-        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
-            except ValueError:
-                continue
-        return None
-
-    def _make_samp_id(self, loca_id, samp_ref, samp_top):
-        return f"{loca_id}_{samp_ref}_{samp_top}"
 
     def _build_lookup(self, group_name: str, value_col: str) -> dict:
         df = self.parser.get_group(group_name)
@@ -188,8 +56,6 @@ class AGSTransformer:
 
     def _build_filter_lookups(self):
         return (
-            self._build_lookup("LOCA", "LOCA_CLST"),
-            self._build_lookup("LOCA", "LOCA_TYPE"),
             self._build_lookup("GEOL", "GEOL_LEG"),
             self._build_lookup("GEOL", "GEOL_GEO2"),
             self._build_lookup("GEOL", "GEOL_GEOL"),
@@ -198,38 +64,24 @@ class AGSTransformer:
 
     def _build_geol_intervals_lookup(self):
         df = self.parser.get_group("GEOL")
-        if df is None:
-            return {}
-        required_cols = {"LOCA_ID", "GEOL_TOP", "GEOL_BASE"}
-        if not required_cols.issubset(df.columns):
+        if df is None or not {"LOCA_ID", "GEOL_TOP", "GEOL_BASE"}.issubset(df.columns):
             return {}
 
-        available_cols = [
-            col for col in ["LOCA_ID", "GEOL_TOP", "GEOL_BASE", "GEOL_GEO2", "GEOL_LEG", "GEOL_GEOL"]
-            if col in df.columns
-        ]
-        geol_df = df[available_cols].copy()
+        cols = ["LOCA_ID", "GEOL_TOP", "GEOL_BASE"] + \
+               [c for c in ["GEOL_GEO2", "GEOL_LEG", "GEOL_GEOL"] if c in df.columns]
+        geol_df = df[cols].copy()
         geol_df["LOCA_ID"] = geol_df["LOCA_ID"].astype(str)
         geol_df["GEOL_TOP"] = geol_df["GEOL_TOP"].apply(self._safe_float)
         geol_df["GEOL_BASE"] = geol_df["GEOL_BASE"].apply(self._safe_float)
         geol_df = geol_df.dropna(subset=["LOCA_ID", "GEOL_TOP", "GEOL_BASE"])
 
-        intervals = {}
-        for _, row in geol_df.iterrows():
-            loca_id = row["LOCA_ID"]
-            intervals.setdefault(loca_id, []).append(
-                {
-                    "GEOL_TOP": row["GEOL_TOP"],
-                    "GEOL_BASE": row["GEOL_BASE"],
-                    "GEOL_GEO2": row.get("GEOL_GEO2"),
-                    "GEOL_LEG": row.get("GEOL_LEG"),
-                    "GEOL_GEOL": row.get("GEOL_GEOL"),
-                }
+        return {
+            loca_id: sorted(
+                group.to_dict("records"),
+                key=lambda x: (x["GEOL_TOP"], x["GEOL_BASE"])
             )
-
-        for loca_id in intervals:
-            intervals[loca_id].sort(key=lambda item: (item["GEOL_TOP"], item["GEOL_BASE"]))
-        return intervals
+            for loca_id, group in geol_df.groupby("LOCA_ID")
+        }
 
     def _map_geol_value_by_interval(self, out: pd.DataFrame, table_name: str, value_column: str):
         depth_col = self.GEOLOGY_INTERVAL_DEPTH_COLUMNS.get(table_name)
@@ -282,7 +134,7 @@ class AGSTransformer:
             if depth_col in out.columns:
                 depth = out[depth_col].apply(self._safe_float)
                 out[elev_col_name] = [
-                    (gl - d) if (gl is not None and d is not None) else None
+                    round(gl - d, 2) if (gl is not None and d is not None) else None
                     for gl, d in zip(loca_gl, depth)
                 ]
 
@@ -291,57 +143,26 @@ class AGSTransformer:
     def _inject_filter_columns(self, out: pd.DataFrame, table_name: str = None) -> pd.DataFrame:
         """
         Injects calculated filter columns (e.g., GEOL_LEG, GEOL_GEO2, GEOL_GEOL) into the DataFrame.
-        These columns are only added for specific tables.
         """
-        # List of tables where geology-related columns should be added
         tables_with_geology = {
-            "geol", "core", "dlog", "detl", "samp", "spec", "dobs", "disc",
-            "scpt", "ispt", "trit", "cbrt", "dcpt", "dprg",
-            "weth", "frac", "fghg", "flsh", "iden", "isag"
+            "GEOL", "CORE", "DLOG", "DETL", "SAMP", "SPEC", "DOBS", "DISC",
+            "SCPT", "ISPT", "TRIT", "CBRT", "DCPT", "DPRG",
+            "WETH", "FRAC", "FGHG", "FLSH", "IDEN", "ISAG"
         }
-
-        if table_name not in tables_with_geology:
+        if table_name not in tables_with_geology or "LOCA_ID" not in out.columns:
             return out
 
-        if "LOCA_ID" in out.columns:
-            loca_ids = out["LOCA_ID"].where(out["LOCA_ID"].notna(), "").astype(str)
-            mapped_geol_leg = self._map_geol_value_by_interval(out, table_name, "GEOL_LEG")
-            if mapped_geol_leg is None:
-                mapped_geol_leg = loca_ids.map(self.geol_leg_lookup)
-            mapped_geol_geo2 = self._map_geol_value_by_interval(out, table_name, "GEOL_GEO2")
-            if mapped_geol_geo2 is None:
-                mapped_geol_geo2 = loca_ids.map(self.geol_geo2_lookup)
-            mapped_geol_geol = self._map_geol_value_by_interval(out, table_name, "GEOL_GEOL")
-            if mapped_geol_geol is None:
-                mapped_geol_geol = loca_ids.map(self.geol_geol_lookup)
-        else:
-            mapped_geol_leg = None
-            mapped_geol_geo2 = None
-            mapped_geol_geol = None
+        loca_ids = out["LOCA_ID"].where(out["LOCA_ID"].notna(), "").astype(str)
+        lookups = {"GEOL_LEG": self.geol_leg_lookup, "GEOL_GEO2": self.geol_geo2_lookup, "GEOL_GEOL": self.geol_geol_lookup}
 
-        if "GEOL_LEG" in out.columns:
-            if mapped_geol_leg is not None:
-                out["GEOL_LEG"] = out["GEOL_LEG"].where(
-                    out["GEOL_LEG"].notna(), mapped_geol_leg
-                )
-        else:
-            out["GEOL_LEG"] = mapped_geol_leg
-
-        if "GEOL_GEO2" in out.columns:
-            if mapped_geol_geo2 is not None:
-                out["GEOL_GEO2"] = out["GEOL_GEO2"].where(
-                    out["GEOL_GEO2"].notna(), mapped_geol_geo2
-                )
-        else:
-            out["GEOL_GEO2"] = mapped_geol_geo2
-
-        if "GEOL_GEOL" in out.columns:
-            if mapped_geol_geol is not None:
-                out["GEOL_GEOL"] = out["GEOL_GEOL"].where(
-                    out["GEOL_GEOL"].notna(), mapped_geol_geol
-                )
-        else:
-            out["GEOL_GEOL"] = mapped_geol_geol
+        for col_name, lookup in lookups.items():
+            mapped = self._map_geol_value_by_interval(out, table_name, col_name)
+            if mapped is None:
+                mapped = loca_ids.map(lookup)
+            if col_name in out.columns:
+                out[col_name] = out[col_name].where(out[col_name].notna(), mapped)
+            else:
+                out[col_name] = mapped
 
         return out
 
@@ -349,9 +170,10 @@ class AGSTransformer:
                       extra_cols: dict = None) -> pd.DataFrame:
         """
         Generic pass-through: takes all columns from the raw AGS DataFrame,
-        drops FILE_FSET, injects source_file (and any extra_cols), then
-        reindexes to the schema in EXPECTED_CSVS so column order is fixed
-        and any missing columns are filled with None.
+        drops FILE_FSET, injects source_file and any extra_cols, then
+        injects elevation and filter columns.
+        
+        Column order is not enforced — raw AGS column order is preserved.
         """
         out = df.copy()
         out.drop(columns=[c for c in ["FILE_FSET"] if c in out.columns], inplace=True)
@@ -359,681 +181,66 @@ class AGSTransformer:
         if extra_cols:
             for col, values in extra_cols.items():
                 out.insert(0, col, values)
-        # Reindex to schema — missing columns become NaN, extra columns dropped
-        out = out.reindex(columns=EXPECTED_CSVS[table_name])
         out = self._inject_elevation(out, table_name)
         return self._inject_filter_columns(out, table_name)
 
     def _samp_id_series(self, df: pd.DataFrame) -> pd.Series:
         """Builds the composite samp_id for sample-linked tables."""
-        return (
-            df.get("LOCA_ID", pd.Series([""] * len(df))).astype(str)
-            + "_"
-            + df.get("SAMP_REF", pd.Series([""] * len(df))).astype(str)
-            + "_"
-            + df.get("SAMP_TOP", pd.Series([""] * len(df))).astype(str)
-        )
+        return df.get("LOCA_ID", "").astype(str) + "_" + \
+               df.get("SAMP_REF", "").astype(str) + "_" + \
+               df.get("SAMP_TOP", "").astype(str)
 
     def available_tables(self) -> list:
-        """Return exportable AGS groups discovered in the loaded file, in file order."""
-        tables = []
-        for group_name, df in self.parser.tables.items():
-            if group_name in self.SKIP_GROUPS:
-                continue
-            if df is None:
-                continue
-            tables.append(group_name.lower())
-        return tables
+        """Return AGS groups discovered in the loaded file, in file order."""
+        return [name for name, df in self.parser.tables.items() if df is not None]
 
     def transform_table(self, table_name: str) -> pd.DataFrame:
         """
-        Dynamically transform any AGS table from the loaded file.
-        Uses AGS-native headers and applies optional plugin enrichments.
-        Missing prerequisite columns for enrichments are ignored safely.
+        Transform any AGS table with best-effort strategy:
+        1. Check for explicit special-case method (e.g., transform_loca)
+        2. Else use generic pass-through with samp_id injection if applicable
+
+        Args:
+            table_name: AGS group name in original uppercase (e.g. 'LOCA', 'SAMP', 'ISPT')
+
+        Returns:
+            Transformed DataFrame with source_file, samp_id, ELEV_*, filters injected
         """
-        table_key = table_name.lower()
-        df = self.parser.get_group(table_key.upper())
+        # Special case: LOCA has custom coordinate handling
+        if table_name == "LOCA":
+            return self.transform_loca()
+
+        # Generic path: get raw data, inject samp_id if needed, pass through
+        df = self.parser.get_group(table_name)
         if df is None:
-            return pd.DataFrame(columns=["source_file"])
+            return self._empty_df(table_name)
 
-        out = df.copy()
-        out.drop(columns=[c for c in ["FILE_FSET"] if c in out.columns], inplace=True)
+        extra_cols = None
+        if table_name in self.GROUPS_WITH_SAMP_ID:
+            extra_cols = {"samp_id": self._samp_id_series(df)}
 
-        if "source_file" in out.columns:
-            out["source_file"] = out["source_file"].where(
-                out["source_file"].notna(), self.source_file
-            )
-        else:
-            out.insert(0, "source_file", self.source_file)
+        return self._pass_through(df, table_name, extra_cols=extra_cols)
 
-        # Derive samp_id when sample-link key columns are present.
-        if (
-            "samp_id" not in out.columns
-            and {"LOCA_ID", "SAMP_REF", "SAMP_TOP"}.issubset(out.columns)
-        ):
-            out.insert(0, "samp_id", self._samp_id_series(out))
-
-        # Preserve data description in PROJ exports when provided by the user.
-        if table_key == "proj" and self.data_desc and "data_desc" not in out.columns:
-            out.insert(1, "data_desc", self.data_desc)
-
-        # Keep legacy lat/lon enrichment for LOCA when coordinate columns are present.
-        if table_key == "loca" and "lat" not in out.columns and "lon" not in out.columns:
-            lats, lons = [], []
-            for _, r in out.iterrows():
-                e = self._safe_float(r.get("LOCA_NATE"))
-                n = self._safe_float(r.get("LOCA_NATN"))
-                lat, lon = bng_to_wgs84(e, n) if (e and n) else (None, None)
-                lats.append(lat)
-                lons.append(lon)
-            out["lat"] = lats
-            out["lon"] = lons
-
-        out = self._inject_elevation(out, table_key)
-        return self._inject_filter_columns(out, table_key)
-
-    def transform_proj(self) -> pd.DataFrame:
-        df = self.parser.get_group("PROJ")
-        if df is None:
-            return pd.DataFrame(columns=EXPECTED_CSVS["proj"])
-
-        out = df.copy()
-        out.drop(columns=[c for c in ["FILE_FSET"] if c in out.columns], inplace=True)
-        out.insert(0, "source_file", self.source_file)
-        out.insert(1, "data_desc", self.data_desc)
-        return out.reindex(columns=EXPECTED_CSVS["proj"])
-
-    # ------------------------------------------------------------------ #
-    # Location spine                                                       #
-    # ------------------------------------------------------------------ #
+    # ================================================================== #
+    # Special case: LOCA transformation with BNG→WGS84 conversion        #
+    # ================================================================== #
 
     def transform_loca(self) -> pd.DataFrame:
+        """Special handling for LOCA: derives WGS84 lat/lon from BNG coords."""
         df = self.parser.get_group("LOCA")
         if df is None:
-            return self._empty_df("loca")
+            return self._empty_df("LOCA")
 
-        out = df.copy()
-        out.drop(columns=[c for c in ["FILE_FSET"] if c in out.columns], inplace=True)
-
-        # Derive WGS84 lat/lon from BNG eastings/northings
-        lats, lons = [], []
-        for _, r in out.iterrows():
-            e = self._safe_float(r.get("LOCA_NATE"))
-            n = self._safe_float(r.get("LOCA_NATN"))
-            lat, lon = bng_to_wgs84(e, n) if (e and n) else (None, None)
-            lats.append(lat)
-            lons.append(lon)
-
+        out = df.drop(columns=[c for c in ["FILE_FSET"] if c in df.columns], inplace=False)
         out.insert(0, "source_file", self.source_file)
-        out["lat"] = lats
-        out["lon"] = lons
 
-        out = out.reindex(columns=EXPECTED_CSVS["loca"])
-        return self._inject_filter_columns(out, "loca")
-
-    # ------------------------------------------------------------------ #
-    # Samples                                                              #
-    # ------------------------------------------------------------------ #
-
-    def transform_samp(self) -> pd.DataFrame:
-        df = self.parser.get_group("SAMP")
-        if df is None:
-            return self._empty_df("samp")
-
-        return self._pass_through(
-            df, "samp",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    # ------------------------------------------------------------------ #
-    # Geology / field description                                          #
-    # ------------------------------------------------------------------ #
-
-    def transform_geol(self) -> pd.DataFrame:
-        df = self.parser.get_group("GEOL")
-        if df is None:
-            return self._empty_df("geol")
-        return self._pass_through(df, "geol")
-
-    def transform_bkfl(self) -> pd.DataFrame:
-        df = self.parser.get_group("BKFL")
-        if df is None:
-            return self._empty_df("bkfl")
-        return self._pass_through(df, "bkfl")
-
-    def transform_detl(self) -> pd.DataFrame:
-        df = self.parser.get_group("DETL")
-        if df is None:
-            return self._empty_df("detl")
-        return self._pass_through(df, "detl")
-
-    def transform_weth(self) -> pd.DataFrame:
-        df = self.parser.get_group("WETH")
-        if df is None:
-            return self._empty_df("weth")
-        return self._pass_through(df, "weth")
-
-    def transform_core(self) -> pd.DataFrame:
-        df = self.parser.get_group("CORE")
-        if df is None:
-            return self._empty_df("core")
-        return self._pass_through(df, "core")
-
-    def transform_frac(self) -> pd.DataFrame:
-        df = self.parser.get_group("FRAC")
-        if df is None:
-            return self._empty_df("frac")
-        return self._pass_through(df, "frac")
-
-    def transform_hdph(self) -> pd.DataFrame:
-        df = self.parser.get_group("HDPH")
-        if df is None:
-            return self._empty_df("hdph")
-        return self._pass_through(df, "hdph")
-
-    def transform_wins(self) -> pd.DataFrame:
-        df = self.parser.get_group("WINS")
-        if df is None:
-            return self._empty_df("wins")
-        return self._pass_through(df, "wins")
-
-    def transform_wstg(self) -> pd.DataFrame:
-        df = self.parser.get_group("WSTG")
-        if df is None:
-            return self._empty_df("wstg")
-        return self._pass_through(df, "wstg")
-
-    def transform_wstd(self) -> pd.DataFrame:
-        df = self.parser.get_group("WSTD")
-        if df is None:
-            return self._empty_df("wstd")
-        return self._pass_through(df, "wstd")
-
-    def transform_mong(self) -> pd.DataFrame:
-        df = self.parser.get_group("MONG")
-        if df is None:
-            return self._empty_df("mong")
-        return self._pass_through(df, "mong")
-
-    def transform_mond(self) -> pd.DataFrame:
-        df = self.parser.get_group("MOND")
-        if df is None:
-            return self._empty_df("mond")
-        return self._pass_through(df, "mond")
-
-    # ------------------------------------------------------------------ #
-    # In-situ tests                                                        #
-    # ------------------------------------------------------------------ #
-
-    def transform_ispt(self) -> pd.DataFrame:
-        df = self.parser.get_group("ISPT")
-        if df is None:
-            return self._empty_df("ispt")
-        return self._pass_through(df, "ispt")
-
-    def transform_dcpg(self) -> pd.DataFrame:
-        df = self.parser.get_group("DCPG")
-        if df is None:
-            return self._empty_df("dcpg")
-        return self._pass_through(df, "dcpg")
-
-    def transform_dcpt(self) -> pd.DataFrame:
-        df = self.parser.get_group("DCPT")
-        if df is None:
-            return self._empty_df("dcpt")
-        return self._pass_through(df, "dcpt")
-
-    def transform_dprg(self) -> pd.DataFrame:
-        df = self.parser.get_group("DPRG")
-        if df is None:
-            return self._empty_df("dprg")
-        return self._pass_through(df, "dprg")
-
-    def transform_icbr(self) -> pd.DataFrame:
-        df = self.parser.get_group("ICBR")
-        if df is None:
-            return self._empty_df("icbr")
-        return self._pass_through(df, "icbr")
-
-    def transform_ipid(self) -> pd.DataFrame:
-        df = self.parser.get_group("IPID")
-        if df is None:
-            return self._empty_df("ipid")
-        return self._pass_through(df, "ipid")
-
-    def transform_ivan(self) -> pd.DataFrame:
-        df = self.parser.get_group("IVAN")
-        if df is None:
-            return self._empty_df("ivan")
-        return self._pass_through(df, "ivan")
-
-    def transform_chis(self) -> pd.DataFrame:
-        df = self.parser.get_group("CHIS")
-        if df is None:
-            return self._empty_df("chis")
-        return self._pass_through(df, "chis")
-
-    def transform_ptim(self) -> pd.DataFrame:
-        df = self.parser.get_group("PTIM")
-        if df is None:
-            return self._empty_df("ptim")
-        return self._pass_through(df, "ptim")
-
-    def transform_lpdn(self) -> pd.DataFrame:
-        df = self.parser.get_group("LPDN")
-        if df is None:
-            return self._empty_df("lpdn")
-        return self._pass_through(
-            df, "lpdn",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    # ------------------------------------------------------------------ #
-    # Lab tests — sample-linked (all get samp_id injected)               #
-    # ------------------------------------------------------------------ #
-
-    def transform_llpl(self) -> pd.DataFrame:
-        df = self.parser.get_group("LLPL")
-        if df is None:
-            return self._empty_df("llpl")
-        return self._pass_through(
-            df, "llpl",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_grat(self) -> pd.DataFrame:
-        df = self.parser.get_group("GRAT")
-        if df is None:
-            return self._empty_df("grat")
-        return self._pass_through(
-            df, "grat",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_grag(self) -> pd.DataFrame:
-        df = self.parser.get_group("GRAG")
-        if df is None:
-            return self._empty_df("grag")
-        return self._pass_through(
-            df, "grag",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_mcvg(self) -> pd.DataFrame:
-        df = self.parser.get_group("MCVG")
-        if df is None:
-            return self._empty_df("mcvg")
-        return self._pass_through(
-            df, "mcvg",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_lnmc(self) -> pd.DataFrame:
-        df = self.parser.get_group("LNMC")
-        if df is None:
-            return self._empty_df("lnmc")
-        return self._pass_through(
-            df, "lnmc",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_mcvt(self) -> pd.DataFrame:
-        df = self.parser.get_group("MCVT")
-        if df is None:
-            return self._empty_df("mcvt")
-        return self._pass_through(
-            df, "mcvt",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cbrg(self) -> pd.DataFrame:
-        df = self.parser.get_group("CBRG")
-        if df is None:
-            return self._empty_df("cbrg")
-        return self._pass_through(
-            df, "cbrg",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cbrt(self) -> pd.DataFrame:
-        df = self.parser.get_group("CBRT")
-        if df is None:
-            return self._empty_df("cbrt")
-        return self._pass_through(
-            df, "cbrt",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cmpg(self) -> pd.DataFrame:
-        df = self.parser.get_group("CMPG")
-        if df is None:
-            return self._empty_df("cmpg")
-        return self._pass_through(
-            df, "cmpg",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cmpt(self) -> pd.DataFrame:
-        df = self.parser.get_group("CMPT")
-        if df is None:
-            return self._empty_df("cmpt")
-        return self._pass_through(
-            df, "cmpt",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cong(self) -> pd.DataFrame:
-        df = self.parser.get_group("CONG")
-        if df is None:
-            return self._empty_df("cong")
-        return self._pass_through(
-            df, "cong",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_cons(self) -> pd.DataFrame:
-        df = self.parser.get_group("CONS")
-        if df is None:
-            return self._empty_df("cons")
-        return self._pass_through(
-            df, "cons",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_shbg(self) -> pd.DataFrame:
-        df = self.parser.get_group("SHBG")
-        if df is None:
-            return self._empty_df("shbg")
-        return self._pass_through(
-            df, "shbg",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_shbt(self) -> pd.DataFrame:
-        df = self.parser.get_group("SHBT")
-        if df is None:
-            return self._empty_df("shbt")
-        return self._pass_through(
-            df, "shbt",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_trig(self) -> pd.DataFrame:
-        df = self.parser.get_group("TRIG")
-        if df is None:
-            return self._empty_df("trig")
-        return self._pass_through(
-            df, "trig",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_trit(self) -> pd.DataFrame:
-        df = self.parser.get_group("TRIT")
-        if df is None:
-            return self._empty_df("trit")
-        return self._pass_through(
-            df, "trit",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_gchm(self) -> pd.DataFrame:
-        df = self.parser.get_group("GCHM")
-        if df is None:
-            return self._empty_df("gchm")
-        return self._pass_through(
-            df, "gchm",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_eres(self) -> pd.DataFrame:
-        df = self.parser.get_group("ERES")
-        if df is None:
-            return self._empty_df("eres")
-        return self._pass_through(
-            df, "eres",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_spec(self) -> pd.DataFrame:
-        df = self.parser.get_group("SPEC")
-        if df is None:
-            return self._empty_df("spec")
-        return self._pass_through(df, "spec")
-
-    def transform_cdia(self) -> pd.DataFrame:
-        df = self.parser.get_group("CDIA")
-        if df is None:
-            return self._empty_df("cdia")
-        return self._pass_through(df, "cdia")
-
-    def transform_disc(self) -> pd.DataFrame:
-        df = self.parser.get_group("DISC")
-        if df is None:
-            return self._empty_df("disc")
-        return self._pass_through(df, "disc")
-
-    def transform_dlog(self) -> pd.DataFrame:
-        df = self.parser.get_group("DLOG")
-        if df is None:
-            return self._empty_df("dlog")
-        return self._pass_through(df, "dlog")
-
-    def transform_dobs(self) -> pd.DataFrame:
-        df = self.parser.get_group("DOBS")
-        if df is None:
-            return self._empty_df("dobs")
-        return self._pass_through(df, "dobs")
-
-    def transform_dprb(self) -> pd.DataFrame:
-        df = self.parser.get_group("DPRB")
-        if df is None:
-            return self._empty_df("dprb")
-        return self._pass_through(df, "dprb")
-
-    def transform_drem(self) -> pd.DataFrame:
-        df = self.parser.get_group("DREM")
-        if df is None:
-            return self._empty_df("drem")
-        return self._pass_through(df, "drem")
-
-    def transform_fghg(self) -> pd.DataFrame:
-        df = self.parser.get_group("FGHG")
-        if df is None:
-            return self._empty_df("fghg")
-        return self._pass_through(df, "fghg")
-
-    def transform_flsh(self) -> pd.DataFrame:
-        df = self.parser.get_group("FLSH")
-        if df is None:
-            return self._empty_df("flsh")
-        return self._pass_through(df, "flsh")
-
-    def transform_hdia(self) -> pd.DataFrame:
-        df = self.parser.get_group("HDIA")
-        if df is None:
-            return self._empty_df("hdia")
-        return self._pass_through(df, "hdia")
-
-    def transform_horn(self) -> pd.DataFrame:
-        df = self.parser.get_group("HORN")
-        if df is None:
-            return self._empty_df("horn")
-        return self._pass_through(df, "horn")
-
-    def transform_iden(self) -> pd.DataFrame:
-        df = self.parser.get_group("IDEN")
-        if df is None:
-            return self._empty_df("iden")
-        return self._pass_through(df, "iden")
-
-    def transform_ifid(self) -> pd.DataFrame:
-        df = self.parser.get_group("IFID")
-        if df is None:
-            return self._empty_df("ifid")
-        return self._pass_through(df, "ifid")
-
-    def transform_ipen(self) -> pd.DataFrame:
-        df = self.parser.get_group("IPEN")
-        if df is None:
-            return self._empty_df("ipen")
-        return self._pass_through(df, "ipen")
-
-    def transform_iprg(self) -> pd.DataFrame:
-        df = self.parser.get_group("IPRG")
-        if df is None:
-            return self._empty_df("iprg")
-        return self._pass_through(df, "iprg")
-
-    def transform_iprt(self) -> pd.DataFrame:
-        df = self.parser.get_group("IPRT")
-        if df is None:
-            return self._empty_df("iprt")
-        return self._pass_through(df, "iprt")
-
-    def transform_irdx(self) -> pd.DataFrame:
-        df = self.parser.get_group("IRDX")
-        if df is None:
-            return self._empty_df("irdx")
-        return self._pass_through(df, "irdx")
-
-    def transform_ires(self) -> pd.DataFrame:
-        df = self.parser.get_group("IRES")
-        if df is None:
-            return self._empty_df("ires")
-        return self._pass_through(df, "ires")
-
-    def transform_isag(self) -> pd.DataFrame:
-        df = self.parser.get_group("ISAG")
-        if df is None:
-            return self._empty_df("isag")
-        return self._pass_through(df, "isag")
-
-    def transform_isat(self) -> pd.DataFrame:
-        df = self.parser.get_group("ISAT")
-        if df is None:
-            return self._empty_df("isat")
-        return self._pass_through(df, "isat")
-
-    def transform_pltg(self) -> pd.DataFrame:
-        df = self.parser.get_group("PLTG")
-        if df is None:
-            return self._empty_df("pltg")
-        return self._pass_through(df, "pltg")
-
-    def transform_pmtg(self) -> pd.DataFrame:
-        df = self.parser.get_group("PMTG")
-        if df is None:
-            return self._empty_df("pmtg")
-        return self._pass_through(df, "pmtg")
-
-    def transform_pumt(self) -> pd.DataFrame:
-        df = self.parser.get_group("PUMT")
-        if df is None:
-            return self._empty_df("pumt")
-        return self._pass_through(df, "pumt")
-
-    def transform_scdg(self) -> pd.DataFrame:
-        df = self.parser.get_group("SCDG")
-        if df is None:
-            return self._empty_df("scdg")
-        return self._pass_through(df, "scdg")
-
-    def transform_scpp(self) -> pd.DataFrame:
-        df = self.parser.get_group("SCPP")
-        if df is None:
-            return self._empty_df("scpp")
-        return self._pass_through(df, "scpp")
-
-    def transform_scpt(self) -> pd.DataFrame:
-        df = self.parser.get_group("SCPT")
-        if df is None:
-            return self._empty_df("scpt")
-        return self._pass_through(df, "scpt")
-
-    def transform_wadd(self) -> pd.DataFrame:
-        df = self.parser.get_group("WADD")
-        if df is None:
-            return self._empty_df("wadd")
-        return self._pass_through(df, "wadd")
-
-    def transform_wgpg(self) -> pd.DataFrame:
-        df = self.parser.get_group("WGPG")
-        if df is None:
-            return self._empty_df("wgpg")
-        return self._pass_through(df, "wgpg")
-
-    def transform_wgpt(self) -> pd.DataFrame:
-        df = self.parser.get_group("WGPT")
-        if df is None:
-            return self._empty_df("wgpt")
-        return self._pass_through(df, "wgpt")
-
-    def transform_lden(self) -> pd.DataFrame:
-        df = self.parser.get_group("LDEN")
-        if df is None:
-            return self._empty_df("lden")
-        return self._pass_through(
-            df, "lden",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_lhvn(self) -> pd.DataFrame:
-        df = self.parser.get_group("LHVN")
-        if df is None:
-            return self._empty_df("lhvn")
-        return self._pass_through(
-            df, "lhvn",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_lpen(self) -> pd.DataFrame:
-        df = self.parser.get_group("LPEN")
-        if df is None:
-            return self._empty_df("lpen")
-        return self._pass_through(
-            df, "lpen",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_lvan(self) -> pd.DataFrame:
-        df = self.parser.get_group("LVAN")
-        if df is None:
-            return self._empty_df("lvan")
-        return self._pass_through(
-            df, "lvan",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_pipe(self) -> pd.DataFrame:
-        df = self.parser.get_group("PIPE")
-        if df is None:
-            return self._empty_df("pipe")
-        return self._pass_through(df, "pipe")
-
-    def transform_rden(self) -> pd.DataFrame:
-        df = self.parser.get_group("RDEN")
-        if df is None:
-            return self._empty_df("rden")
-        return self._pass_through(
-            df, "rden",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_rplt(self) -> pd.DataFrame:
-        df = self.parser.get_group("RPLT")
-        if df is None:
-            return self._empty_df("rplt")
-        return self._pass_through(
-            df, "rplt",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
-
-    def transform_rucs(self) -> pd.DataFrame:
-        df = self.parser.get_group("RUCS")
-        if df is None:
-            return self._empty_df("rucs")
-        return self._pass_through(
-            df, "rucs",
-            extra_cols={"samp_id": self._samp_id_series(df)},
-        )
+        eastings = out.get("LOCA_NATE", pd.Series(dtype=object)).apply(self._safe_float)
+        northings = out.get("LOCA_NATN", pd.Series(dtype=object)).apply(self._safe_float)
+        latlon = [
+            bng_to_wgs84(e, n) if (e and n) else (None, None)
+            for e, n in zip(eastings, northings)
+        ]
+        out["lat"] = [ll[0] for ll in latlon]
+        out["lon"] = [ll[1] for ll in latlon]
+        return self._inject_filter_columns(out, "LOCA")
 
