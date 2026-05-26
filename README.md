@@ -187,7 +187,7 @@ This plugin is actively maintained. For issues, feature requests, or contributio
 - Oliver Burdekin (burdGIS) — Original author
 - Richard Meredith (GeoEnvironmental) — Contributor
 
-- Faith Hamieson - CSV export Contributor 
+- Faith Jamieson - CSV export Contributor 
 ---
 
 **Questions?** See the detailed documentation files or check the sample workflow in the tests folder.

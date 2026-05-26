@@ -11,6 +11,7 @@ Used by:
 """
 
 from .exporter import CSVExporter
+from .column_metadata import build_ags_column_metadata_df
 
 
 def export_ags_to_csv(transformer, output_dir, append_mode=False, feedback=None):
@@ -37,7 +38,8 @@ def export_ags_to_csv(transformer, output_dir, append_mode=False, feedback=None)
     
     exporter = CSVExporter(output_dir, append_mode=append_mode)
     stats = {"tables_exported": 0, "total_rows": 0}
-    
+    exported_tables = {}
+
     try:
         # Discover all tables from transformer
         tables = transformer.available_tables()
@@ -55,7 +57,8 @@ def export_ags_to_csv(transformer, output_dir, append_mode=False, feedback=None)
                 
                 # Write to CSV with dedup/append logic
                 exporter.write(table, df, transformer.source_file)
-                
+                exported_tables[table] = df
+
                 stats["tables_exported"] += 1
                 stats["total_rows"] += len(df)
                 feedback.pushInfo(f"  Wrote {table}.csv ({len(df)} rows)")
@@ -63,9 +66,18 @@ def export_ags_to_csv(transformer, output_dir, append_mode=False, feedback=None)
             except Exception as e:
                 feedback.reportError(f"Error transforming {table}: {str(e)}")
         
+        # Write column metadata CSV (one row per exported column)
+        parser_column_metadata = getattr(transformer.parser, "column_metadata", {})
+        metadata_df = build_ags_column_metadata_df(
+            exported_tables=exported_tables,
+            fallback_source_file=transformer.source_file,
+            parser_column_metadata=parser_column_metadata,
+        )
+        exporter.write_column_metadata(metadata_df)
+
         # Write manifest
         exporter.write_manifest()
-        feedback.pushInfo("CSV export complete — manifest.csv written")
+        feedback.pushInfo("CSV export complete — manifest.csv and ags_column_metadata.csv written")
         
     except Exception as e:
         feedback.reportError(f"CSV export failed: {str(e)}")

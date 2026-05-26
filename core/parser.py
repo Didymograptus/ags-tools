@@ -19,6 +19,9 @@ class AGSParser:
         self.filename = Path(filepath).name
         self.tables = {}
         self.headings = {}
+        # Per-group, per-column metadata extracted from AGS UNIT/TYPE rows.
+        # Shape: {"GROUP": {"COLUMN": {"unit": "", "ags_type": ""}}}
+        self.column_metadata = {}
 
     # load uses python-ags4 to read the AGS file and populate the tables and headings dictionaries. It returns True if successful.
     def load(self) -> bool:
@@ -31,12 +34,39 @@ class AGSParser:
         # include UNIT/TYPE metadata rows in either index or HEADING column.
         # Remove these here so all downstream exports are consistently data-only.
         cleaned_tables = {}
+        column_metadata = {}
         for group_name, df in tables.items():
             if df is None:
                 cleaned_tables[group_name] = df
+                column_metadata[group_name] = {}
                 continue
 
             out = df.copy()
+
+            # Extract per-column metadata from AGS UNIT/TYPE rows before cleanup.
+            unit_row = None
+            type_row = None
+            if "HEADING" in out.columns:
+                heading = out["HEADING"].astype(str).str.strip().str.upper()
+                unit_rows = out.loc[heading == "UNIT"]
+                type_rows = out.loc[heading == "TYPE"]
+                if not unit_rows.empty:
+                    unit_row = unit_rows.iloc[0]
+                if not type_rows.empty:
+                    type_row = type_rows.iloc[0]
+
+            group_meta = {}
+            for col in out.columns:
+                unit_val = ""
+                type_val = ""
+                if unit_row is not None and col in unit_row.index:
+                    raw_unit = unit_row.get(col, "")
+                    unit_val = "" if raw_unit is None else str(raw_unit).strip()
+                if type_row is not None and col in type_row.index:
+                    raw_type = type_row.get(col, "")
+                    type_val = "" if raw_type is None else str(raw_type).strip()
+                group_meta[col] = {"unit": unit_val, "ags_type": type_val}
+            column_metadata[group_name] = group_meta
 
             # Drop metadata rows when they are encoded as index labels.
             if out.index is not None:
@@ -51,6 +81,7 @@ class AGSParser:
             cleaned_tables[group_name] = out.reset_index(drop=True)
 
         self.tables = cleaned_tables
+        self.column_metadata = column_metadata
         self.headings = headings
         return True
 

@@ -83,12 +83,11 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
 
     def group(self):
         """User-facing group name in Processing toolbox."""
-        return self.tr("AGS tools")
+        return ""
 
     def groupId(self):
         """Internal group identifier."""
-        return "agstools"
-
+        return ""
     def shortHelpString(self):
         """Help text shown in Processing toolbox."""
         return self.tr(

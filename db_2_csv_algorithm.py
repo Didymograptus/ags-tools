@@ -45,8 +45,10 @@ from qgis.utils import iface
 
 if __package__:
     from .core.exporter import CSVExporter
+    from .core.column_metadata import build_ags_column_metadata_df
 else:
     from core.exporter import CSVExporter
+    from core.column_metadata import build_ags_column_metadata_df
 
 
 # ================================================================ #
@@ -338,6 +340,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
 
         # ---- Step 6: Export Each Table ---- #
         exported = 0
+        exported_tables = {}
         for table in tables_to_export:
             # Allow user to cancel mid-processing
             if feedback.isCanceled():
@@ -377,16 +380,23 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
                 
                 # Write table to CSV with dedup/append logic
                 exporter.write(table, df, source_file=batch_source_file)
+                exported_tables[table] = df
                 feedback.pushInfo(f"  Wrote {table}.csv  ({len(df)} rows)")
                 exported += 1
             except Exception as exc:
                 feedback.reportError(f"Error exporting '{table}': {exc}")
 
-        # ---- Step 7: Write Manifest ---- #
+        # ---- Step 7: Write Column Metadata + Manifest ---- #
+        metadata_df = build_ags_column_metadata_df(
+            exported_tables=exported_tables,
+            fallback_source_file=f"{db_name}|{csv_folder_name}",
+            parser_column_metadata={},
+        )
+        exporter.write_column_metadata(metadata_df)
         exporter.write_manifest()
         feedback.pushInfo(
             f'CSV export complete — {exported}/{len(tables_to_export)} tables written. '
-            f'manifest.csv updated.'
+            f'manifest.csv and ags_column_metadata.csv updated.'
         )
 
         return {}
@@ -401,15 +411,15 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self):
         """User-facing algorithm name in QGIS Processing toolbox."""
-        return self.tr('DB2CSV')
+        return self.tr('DB to CSV')
 
     def group(self):
         """User-facing group name in Processing toolbox."""
-        return self.tr(self.groupId())
+        return ''
 
     def groupId(self):
         """Internal group identifier."""
-        return 'agstools'
+        return ''
 
     def tr(self, string):
         """Translate string for QGIS UI."""

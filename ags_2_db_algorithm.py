@@ -612,14 +612,14 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 		Returns the translated algorithm name, which should be used for any
 		user-visible display of the algorithm name.
 		"""
-		return self.tr(self.name())
+		return self.tr('AGS to DB')
 
 	def group(self):
 		"""
 		Returns the name of the group this algorithm belongs to. This string
 		should be localised.
 		"""
-		return self.tr(self.groupId())
+		return ''
 
 	def groupId(self):
 		"""
@@ -629,7 +629,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 		contain lowercase alphanumeric characters only and no spaces or other
 		formatting characters.
 		"""
-		return 'agstools'
+		return ''
 
 	def tr(self, string):
 		return QCoreApplication.translate('Processing', string)

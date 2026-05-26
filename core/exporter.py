@@ -77,6 +77,35 @@ class CSVExporter:
             "exported_at": datetime.now().date().isoformat(),
         })
 
+    def write_column_metadata(self, metadata_df: pd.DataFrame):
+        """
+        Write ags_column_metadata.csv with one row per exported table column.
+
+        De-duplicates on (source_file, table_name, column_name) so re-exports of the
+        same source update metadata without producing duplicates.
+        """
+        path = os.path.join(self.output_dir, "ags_column_metadata.csv")
+
+        out = metadata_df.copy()
+        expected_cols = ["table_name", "column_name", "unit", "ags_type", "source_file"]
+        for col in expected_cols:
+            if col not in out.columns:
+                out[col] = ""
+        out = out[expected_cols]
+        for col in expected_cols:
+            out[col] = out[col].fillna("").astype(str)
+
+        if self.append_mode and os.path.exists(path):
+            existing_df = pd.read_csv(path, encoding="utf-8-sig").fillna("").astype(str)
+            out = pd.concat([existing_df, out], ignore_index=True)
+
+        out = out.drop_duplicates(
+            subset=["source_file", "table_name", "column_name"],
+            keep="last",
+        )
+
+        out.to_csv(path, index=False, encoding="utf-8-sig")
+
     def write_manifest(self):
         """Write manifest.csv, replacing entries for sources written in this export."""
         df = pd.DataFrame(self.manifest_rows)

@@ -67,7 +67,7 @@ class AGSToolsProvider(QgsProcessingProvider):
         string should be a unique, short, character only string, eg "qgis" or
         "gdal". This string should not be localised.
         """
-        return 'AGS tools'
+        return 'agstoolbox'
 
     def name(self):
         """
@@ -76,7 +76,7 @@ class AGSToolsProvider(QgsProcessingProvider):
 
         This string should be short (e.g. "Lastools") and localised.
         """
-        return self.tr('AGS tools')
+        return self.tr('AGS Toolbox')
 
     def icon(self):
         """
