@@ -31,8 +31,10 @@ __copyright__ = '(C) 2023 by Oliver Burdekin / burdGIS'
 __revision__ = '$Format:%H$'
 
 from qgis.core import QgsProcessingProvider
+from .ags_2_csv import AGS2CSVAlgorithm
 from .ags_2_db_algorithm import AGS2DBAlgorithm
 from .ags_validator import AGSValidatorAlgorithm
+from .db_2_csv_algorithm import DB2CSVAlgorithm
 
 
 class AGSToolsProvider(QgsProcessingProvider):
@@ -54,10 +56,10 @@ class AGSToolsProvider(QgsProcessingProvider):
         """
         Loads all algorithms belonging to this provider.
         """
+        self.addAlgorithm(AGS2CSVAlgorithm())
         self.addAlgorithm(AGS2DBAlgorithm())
         self.addAlgorithm(AGSValidatorAlgorithm())
-        # add additional algorithms here
-        # self.addAlgorithm(MyOtherAlgorithm())
+        self.addAlgorithm(DB2CSVAlgorithm())
 
     def id(self):
         """
@@ -65,7 +67,7 @@ class AGSToolsProvider(QgsProcessingProvider):
         string should be a unique, short, character only string, eg "qgis" or
         "gdal". This string should not be localised.
         """
-        return 'AGS tools'
+        return 'agstoolbox'
 
     def name(self):
         """
@@ -74,7 +76,7 @@ class AGSToolsProvider(QgsProcessingProvider):
 
         This string should be short (e.g. "Lastools") and localised.
         """
-        return self.tr('AGS tools')
+        return self.tr('AGS Toolbox')
 
     def icon(self):
         """
