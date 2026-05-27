@@ -36,14 +36,13 @@ from qgis.core import (
 )
 
 if __package__:
-
     from .ags_utils.parser import AGSParser
     from .ags_utils.transformer import AGSTransformer
-    from .ags_utils.exporter import CSVExporter
+    from .ags_utils.csv_pipeline import export_ags_to_csv
 else:
     from ags_utils.parser import AGSParser
     from ags_utils.transformer import AGSTransformer
-    from ags_utils.exporter import CSVExporter
+    from ags_utils.csv_pipeline import export_ags_to_csv
 
 
 class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
