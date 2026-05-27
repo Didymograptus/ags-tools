@@ -36,25 +36,26 @@ from qgis.core import (
 )
 
 if __package__:
-    from .core.parser import AGSParser
-    from .core.transformer import AGSTransformer
-    from .core.csv_pipeline import export_ags_to_csv
+
+    from .ags_utils.parser import AGSParser
+    from .ags_utils.transformer import AGSTransformer
+    from .ags_utils.exporter import CSVExporter
 else:
-    from core.parser import AGSParser
-    from core.transformer import AGSTransformer
-    from core.csv_pipeline import export_ags_to_csv
+    from ags_utils.parser import AGSParser
+    from ags_utils.transformer import AGSTransformer
+    from ags_utils.exporter import CSVExporter
 
 
 class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     """
     QGIS Processing algorithm: Export AGS4 file to CSV tables.
-    
+
     Parameters:
       INPUT: Path to .ags file
       OUTPUT_DIR: Parent directory for CSV output
       OUTPUT_FOLDER_NAME: Name of subfolder to create/append into
       ALLOW_APPEND: Toggle append vs. overwrite mode
-    
+
     Processing Flow:
       1. Validate inputs (file exists, paths valid)
       2. Determine append_mode (prompt user if folder exists)
@@ -62,7 +63,7 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
       4. Transform each group and write to CSV
       5. Write manifest.csv
     """
-    
+
     # Parameter keys for QGIS Processing framework
     INPUT = "INPUT"
     OUTPUT_DIR = "OUTPUT_DIR"
@@ -72,7 +73,7 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # QGIS Algorithm Metadata                                            #
     # ================================================================ #
-    
+
     def name(self):
         """Internal algorithm identifier (used in scripts/API)."""
         return "ags2csv"
@@ -107,7 +108,7 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # QGIS Algorithm Interface: Metadata and Parameter Definition       #
     # ================================================================ #
-    
+
     def initAlgorithm(self, config=None):
         """Define algorithm parameters shown in QGIS Processing dialog."""
         self.addParameter(
@@ -142,11 +143,11 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # Main Processing Logic                                              #
     # ================================================================ #
-    
+
     def processAlgorithm(self, parameters, context, feedback):
         """
         Main processing function: validate inputs → load AGS → transform → export CSVs.
-        
+
         Flow:
           1. Extract and validate all parameters
           2. Resolve output directory
@@ -178,7 +179,7 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
         # Extract base filenames for traceability
         ags_filename = Path(ags_filepath).name
         csv_folder_name = output_folder_name.strip()
-        
+
         # ---- Step 2: Determine Append Mode ---- #
         # If allow_append flag is set AND folder already has CSVs, prompt user
         append_mode = False
@@ -199,7 +200,7 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
                 msg_box.setDefaultButton(QMessageBox.Yes)
                 result = msg_box.exec_()
                 append_mode = (result == QMessageBox.Yes)
-                
+
                 if append_mode:
                     feedback.pushInfo(self.tr("Appending to existing CSVs..."))
                 else:
@@ -232,5 +233,6 @@ class AGS2CSVAlgorithm(QgsProcessingAlgorithm):
         # ---- Step 6: Export All Tables to CSV ---- #
         # Use unified CSV pipeline for consistent behavior
         export_ags_to_csv(transformer, output_dir, append_mode=append_mode, feedback=feedback)
+
 
         return {self.OUTPUT_DIR: output_dir}

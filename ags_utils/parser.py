@@ -1,16 +1,9 @@
-# loading AGS file into memory as pandas DataFrames using python-ags4
+# loading AGS file into memory as pandas DataFrames using  a cut-down version of python-ags4.AGS4
 # script defines a small AGSParser class that loads an AGS file into memory and makes its groups easy to access.
 # once loaded it can then be transformed (in transformer.py) and exported as needed.
 
-try:
-    from python_ags4 import AGS4
-except ModuleNotFoundError:
-    try:
-        from ags4 import AGS4
-    except ModuleNotFoundError:
-        AGS4 = None
+from .AGS4 import AGS4_to_dataframe
 from pathlib import Path
-
 
 class AGSParser:
     # __init__ stores the input path, extracts the source filename, and prepares two dictionaries
@@ -25,11 +18,8 @@ class AGSParser:
 
     # load uses python-ags4 to read the AGS file and populate the tables and headings dictionaries. It returns True if successful.
     def load(self) -> bool:
-        if AGS4 is None:
-            raise ModuleNotFoundError(
-                "Missing AGS parser dependency. Install 'python-ags4' in the QGIS Python environment."
-            )
-        tables, headings = AGS4.AGS4_to_dataframe(self.filepath)
+
+        tables, headings = AGS4_to_dataframe(self.filepath)
         # python-ags4 returns dicts of {GROUP_NAME: DataFrame}. Some AGS files
         # include UNIT/TYPE metadata rows in either index or HEADING column.
         # Remove these here so all downstream exports are consistently data-only.

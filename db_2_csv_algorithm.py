@@ -44,11 +44,11 @@ from qgis.core import (
 from qgis.utils import iface
 
 if __package__:
-    from .core.exporter import CSVExporter
-    from .core.column_metadata import build_ags_column_metadata_df
+    from .ags_utils.exporter import CSVExporter
+    from .ags_utils.column_metadata import build_ags_column_metadata_df
 else:
-    from core.exporter import CSVExporter
-    from core.column_metadata import build_ags_column_metadata_df
+    from .ags_utils.exporter import CSVExporter
+    from .ags_utils.column_metadata import build_ags_column_metadata_df
 
 
 # ================================================================ #
@@ -58,11 +58,11 @@ else:
 def _get_active_db_path():
     """
     Auto-detect GeoPackage/SpatiaLite path from active QGIS layer.
-    
+
     Extracts database path from the layer's OGR source string:
       source = "/path/file.gpkg|layername=LOCA"
       returns: "/path/file.gpkg"
-    
+
     Returns empty string if no valid database layer is active.
     """
     try:
@@ -84,7 +84,7 @@ def _get_active_db_path():
 def _layer_to_dataframe(layer: QgsVectorLayer) -> pd.DataFrame:
     """
     Convert QgsVectorLayer to pandas DataFrame.
-    
+
     - Reads all attribute fields from features
     - Drops geometry column (not exported to CSV)
     - Returns DataFrame with field names as column headers
@@ -99,7 +99,7 @@ def _layer_to_dataframe(layer: QgsVectorLayer) -> pd.DataFrame:
 def _list_db_tables(db_path: str) -> list:
     """
     List all table/layer names in GeoPackage or SpatiaLite.
-    
+
     Strategy:
       1. Try QGIS OGR provider API (QGIS 3.22+)
       2. Fall back to GDAL/OGR if API unavailable
@@ -136,20 +136,20 @@ def _ensure_provenance_columns(
 ) -> pd.DataFrame:
     """
     Append csv_folder_name to source_file for complete data lineage.
-    
+
     Behavior:
       - If source_file exists (from AGS→DB import):
         Append folder: "ags_filename|db_name|proj_id|csv_folder_name"
       - If source_file absent:
         Set to: "csv_folder_name"
-    
+
     Deduplication:
       - Compares first 3 pipe parts (ags_filename|db_name|proj_id)
       - Same source to different folders → old folder replaced by new folder
       - Enables tracking multiple export batches while preventing duplicates
     """
     out = df.copy()
-    
+
     if 'source_file' not in out.columns:
         out['source_file'] = csv_folder_name
     else:
@@ -159,18 +159,18 @@ def _ensure_provenance_columns(
         out['source_file'] = source_values.apply(
             lambda x: x if x.endswith(suffix) else (f"{x}{suffix}" if x else csv_folder_name)
         )
-    
+
     return out
 
 
 class DB2CSVAlgorithm(QgsProcessingAlgorithm):
     """
     QGIS Processing algorithm: Export GeoPackage/SpatiaLite database to CSVs.
-    
+
     Use case:
       Export a database that has been reviewed/edited in QGIS to CSV format
       for Power BI or other analytical tools.
-    
+
     Processing Flow:
       1. Load and validate database path
       2. Discover all tables (filter out metadata tables)
@@ -180,7 +180,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
          - Append csv_folder_name to source_file (data lineage)
          - Write to CSV with dedup/append logic
       4. Write manifest.csv
-    
+
     Modes:
       - Overwrite: Replace all CSVs in output folder
       - Append: Keep existing CSVs, add/replace rows from this DB
@@ -195,7 +195,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # QGIS Algorithm Interface: Parameter Definition                    #
     # ================================================================ #
-    
+
     def initAlgorithm(self, config):
         """Define algorithm parameters shown in QGIS Processing dialog."""
 
@@ -243,11 +243,11 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # Main Processing Logic                                              #
     # ================================================================ #
-    
+
     def processAlgorithm(self, parameters, context, feedback):
         """
         Main processing function: validate → discover tables → transform → export CSVs.
-        
+
         Flow:
           1. Extract and validate parameters
           2. Resolve output directory
@@ -260,7 +260,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
              - Write CSV with dedup logic
           6. Write manifest.csv
         """
-        
+
         # ---- Step 1: Validate Parameters ---- #
         db_path = self.parameterAsString(parameters, self.INPUT_DB, context)
         # Validate database file
@@ -324,17 +324,17 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
         # CSVExporter handles deduplication and append logic
         exporter = CSVExporter(csv_output_dir, append_mode=append_mode)
         db_name = os.path.basename(db_path)
-        
+
         # Note: Future enhancement could enrich tables with elevation/filter columns
         # using transformer.enrich_dataframe() if LOCA/GEOL tables are present in DB
-        
+
         # ---- Step 5: Determine Folder Name for Lineage ---- #
         # Use provided folder_name, or fall back to output directory basename
         if folder_name:
             csv_folder_name = folder_name
         else:
             csv_folder_name = os.path.basename(csv_output_dir)
-        
+
         feedback.pushInfo(f'CSV export folder name for traceability: {csv_folder_name}')
         feedback.pushInfo('Source files will be appended with CSV folder name for full lineage tracking.')
 
@@ -358,13 +358,13 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
             try:
                 # Convert layer to DataFrame (drop geometry)
                 df = _layer_to_dataframe(layer)
-                
+
                 # Append csv_folder_name to source_file for full lineage
                 df = _ensure_provenance_columns(
                     df,
                     csv_folder_name=csv_folder_name,
                 )
-                
+
                 # Extract representative source_file for deduplication key
                 # (CSVExporter uses first 3 pipe-parts for dedup)
                 batch_source_file = ''
@@ -373,11 +373,11 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
                     sources = sources[sources != '']
                     if len(sources) > 0:
                         batch_source_file = sources.iloc[0]
-                
+
                 # Fallback: use database name + folder for tables without source_file
                 if not batch_source_file:
                     batch_source_file = f"{db_name}|{csv_folder_name}"
-                
+
                 # Write table to CSV with dedup/append logic
                 exporter.write(table, df, source_file=batch_source_file)
                 exported_tables[table] = df
@@ -404,7 +404,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
     # ================================================================ #
     # QGIS Algorithm Metadata                                            #
     # ================================================================ #
-    
+
     def name(self):
         """Internal algorithm identifier (used in scripts/API)."""
         return 'DB2CSV'
