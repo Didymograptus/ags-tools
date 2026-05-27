@@ -603,12 +603,12 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
                     try:
                         df = transformer.transform_table(table)
                         exporter.write(table, df, source_file)
-                        feedback.pushInfo(f"Wrote {table}.csv ({len(df)} rows)")
+                        feedback.pushInfo(f"Transformed {table}.csv ({len(df)} rows)")
                     except Exception as e:
                         feedback.reportError(f"Error transforming {table}: {str(e)}")
 
                 exporter.write_manifest()
-                feedback.pushInfo("CSV export complete - wrote manifest.csv")
+                feedback.pushInfo("CSV export complete - created manifest.csv")
 
             except Exception as e:
                 feedback.reportError(f"CSV export failed: {str(e)}")

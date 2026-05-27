@@ -381,7 +381,7 @@ class DB2CSVAlgorithm(QgsProcessingAlgorithm):
                 # Write table to CSV with dedup/append logic
                 exporter.write(table, df, source_file=batch_source_file)
                 exported_tables[table] = df
-                feedback.pushInfo(f"  Wrote {table}.csv  ({len(df)} rows)")
+                feedback.pushInfo(f"  Transformed {table}.csv  ({len(df)} rows)")
                 exported += 1
             except Exception as exc:
                 feedback.reportError(f"Error exporting '{table}': {exc}")
