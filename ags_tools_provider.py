@@ -35,6 +35,7 @@ from .ags_2_csv import AGS2CSVAlgorithm
 from .ags_2_db_algorithm import AGS2DBAlgorithm
 from .ags_validator import AGSValidatorAlgorithm
 from .db_2_csv_algorithm import DB2CSVAlgorithm
+from .AGS_data_summary_plots_algorithm import ags_data_summary_plotsAlgorithm
 
 
 class AGSToolsProvider(QgsProcessingProvider):
@@ -60,6 +61,7 @@ class AGSToolsProvider(QgsProcessingProvider):
         self.addAlgorithm(AGS2DBAlgorithm())
         self.addAlgorithm(AGSValidatorAlgorithm())
         self.addAlgorithm(DB2CSVAlgorithm())
+        self.addAlgorithm(ags_data_summary_plotsAlgorithm())
 
     def id(self):
         """

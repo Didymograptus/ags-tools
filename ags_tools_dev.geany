@@ -27,19 +27,14 @@ long_line_behaviour=1
 long_line_column=80
 
 [files]
-current_page=6
-FILE_NAME_0=14510;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fdb_2_csv_algorithm.py;0;4
-FILE_NAME_1=33978;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_2_db_algorithm.py;0;4
-FILE_NAME_2=1560;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_2_csv.py;0;4
-FILE_NAME_3=0;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Fexporter.py;0;4
-FILE_NAME_4=0;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Fgeo_utils.py;0;4
-FILE_NAME_5=362;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Fparser.py;0;4
-FILE_NAME_6=452;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Ftransformer.py;0;4
-FILE_NAME_7=0;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Fcolumn_metadata.py;0;4
-FILE_NAME_8=2314;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_utils%2Fcsv_pipeline.py;0;4
+current_page=3
+FILE_NAME_0=4346;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_2_db_algorithm.py;0;4
+FILE_NAME_1=1671;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2Fags_tools_provider.py;0;4
+FILE_NAME_2=0;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_data_summary_plots%2FAGS_data_summary_plots.py;0;4
+FILE_NAME_3=20264;Python;0;EUTF-8;0;1;0;%2Fhome%2Ftony%2F.local%2Fshare%2FQGIS%2FQGIS3%2Fprofiles%2Fdefault%2Fpython%2Fplugins%2Fags_tools_dev%2FAGS_data_summary_plots_algorithm.py;0;4
 
 [VTE]
-last_dir=/home/tony/.local/share/QGIS/QGIS3/profiles/default/python/plugins/ags_tools_dev/ags_utils
+last_dir=/home/tony/.local/share/QGIS/QGIS3/profiles/default/python/plugins/ags_tools_dev
 
 [prjorg]
 expanded_paths=/home/tony/.local/share/QGIS/QGIS3/profiles/default/python/plugins/ags_tools_dev/core;

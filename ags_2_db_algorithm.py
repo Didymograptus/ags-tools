@@ -122,7 +122,8 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFileDestination(
                 self.OUTPUT,
                 self.tr('Output File'),
-                fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)'
+                fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)',
+                optional = True
 
             )
         )
@@ -482,22 +483,22 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
     def add_elev_calc_col(self, db_fpath: str, table_name: str, depth_col_names:list, feedback, col_name_loca_gl = 'LOCA_GL'):
         """adds calculated column (elevation) to existing table"""
-        
-      
+
+
         conn = sqlite3.connect(db_fpath)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         listOfTables = list(list(zip(*cursor.fetchall()))[0])
-      
+
         if table_name not in listOfTables:
             print(f"table {table_name} does not exist")
             conn.close()
             return None
         if table_name == 'LOCA':
             return None
-            
+
         print(f"{table_name = }")
-        
+
         qry_dict_loca = f"SELECT distinct lOCA_ID, LOCA_GL FROM LOCA;"
         cursor.execute(qry_dict_loca)
         dct_res_qry = dict(cursor.fetchall())
@@ -518,14 +519,14 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             cursor.execute(qry)
 
         for col_name in depth_col_names:
-            print(f"{table_name = }")   
-            
+            print(f"{table_name = }")
+
             print(f"{col_name = }")
-            try: 
-                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name}_GL REAL GENERATED ALWAYS AS ({col_name_loca_gl} - {col_name})")
+            try:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN ELEV_{col_name} REAL GENERATED ALWAYS AS ({col_name_loca_gl} - {col_name})")
             except:
                 print(f"heading {col_name} not found")
-                  
+
         conn.commit()
 
         conn.close()
@@ -755,12 +756,12 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             first_layer = False
 
         feedback.pushInfo("ALL GROUPS WRITTEN - DB CREATED")
-        
+
         # add version control tables
         feedback.pushInfo("Adding version control tables")
         self.add_meta_and_version_tables(ags_file_path, output_path, user, feedback)
         feedback.pushInfo("Version control bales complete")
-        
+
         # Add elevation data to tables
         feedback.pushInfo("Adding elevation data")
         json_data_path = os.path.join(os.path.dirname(__file__), 'data', 'elev_groups_heads.json')
@@ -769,7 +770,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         for key, value in params.items():
             self.add_elev_calc_col(output_path, key, value, feedback)
         feedback.pushInfo("Elevation data complete")
-        
+
         # After the writing is done, call the helper functions:
         self.add_svg_paths(feedback)
 
