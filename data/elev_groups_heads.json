@@ -1,0 +1,562 @@
+{
+    "AAVT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ACVT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "AELO": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "AFLK": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "AIVT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ALOS": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "APSV": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ARTW": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ASDI": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ASNS": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "AWAD": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "BKFL": [
+        "BKFL_TOP",
+        "BKFL_BASE"
+    ],
+    "CBRG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "CBRT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CDIA": [
+        "CDIA_DPTH"
+    ],
+    "CHIS": [
+        "CHIS_FROM",
+        "CHIS_TO"
+    ],
+    "CHOC": [
+        "SAMP_TOP"
+    ],
+    "CMPG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "CMPT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CONG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "CONS": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CORE": [
+        "CORE_TOP",
+        "CORE_BASE"
+    ],
+    "CTRC": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CTRD": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CTRG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "CTRP": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "CTRS": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "DCPG": [
+        "DCPG_DPTH"
+    ],
+    "DCPT": [
+        "DCPG_DPTH"
+    ],
+    "DETL": [
+        "DETL_TOP",
+        "DETL_BASE"
+    ],
+    "DISC": [
+        "DISC_TOP",
+        "DISC_BASE"
+    ],
+    "DLOG": [
+        "DLOG_TOP",
+        "DLOG_BASE"
+    ],
+    "DOBS": [
+        "DOBS_TOP",
+        "DOBS_BASE"
+    ],
+    "DPRB": [
+        "DPRB_DPTH"
+    ],
+    "DPRG": [
+        "DPRG_TIP"
+    ],
+    "DREM": [
+        "DREM_TOP",
+        "DREM_BASE"
+    ],
+    "ECTN": [
+        "SAMP_TOP"
+    ],
+    "ELRG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ERES": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "ESCG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "ESCT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "FGHG": [
+        "FGHG_TOP",
+        "FGHG_BASE",
+        "FGHG_HBAS",
+        "FGHG_CAS",
+        "FGHG_PRWL",
+        "FGHG_AWL"
+    ],
+    "FGHI": [
+        "FGHG_TOP",
+        "FGHG_BASE"
+    ],
+    "FGHS": [
+        "FGHG_TOP",
+        "FGHG_BASE"
+    ],
+    "FGHT": [
+        "FGHG_TOP",
+        "FGHG_BASE"
+    ],
+    "FLSH": [
+        "FLSH_TOP",
+        "FLSH_BASE"
+    ],
+    "FRAC": [
+        "FRAC_FROM",
+        "FRAC_TO"
+    ],
+    "FRST": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "GCHM": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "GEOL": [
+        "GEOL_TOP",
+        "GEOL_BASE"
+    ],
+    "GRAG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "GRAT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "HDIA": [
+        "HDIA_DPTH"
+    ],
+    "HDPH": [
+        "HDPH_TOP",
+        "HDPH_BASE"
+    ],
+    "HORN": [
+        "HORN_TOP",
+        "HORN_BASE"
+    ],
+    "ICBR": [
+        "ICBR_DPTH"
+    ],
+    "IDEN": [
+        "IDEN_DPTH"
+    ],
+    "IFID": [
+        "IFID_DPTH"
+    ],
+    "IPEN": [
+        "IPEN_DPTH"
+    ],
+    "IPID": [
+        "IPID_DPTH"
+    ],
+    "IPRG": [
+        "IPRG_TOP",
+        "IPRG_BASE",
+        "IPRG_PRWL",
+        "IPRG_SWAL",
+        "IPRG_AWL"
+    ],
+    "IPRT": [
+        "IPRG_TOP",
+        "IPRG_BASE",
+        "IPRT_DPTH"
+    ],
+    "IRDX": [
+        "IRDX_DPTH"
+    ],
+    "IRES": [
+        "IRES_DPTH",
+        "IRES_BASE"
+    ],
+    "ISAG": [
+        "ISAG_DPTS",
+        "ISAG_DPTE"
+    ],
+    "ISAT": [
+        "ISAT_DPTH"
+    ],
+    "ISPT": [
+        "ISPT_TOP",
+        "ISPT_CAS"
+    ],
+    "IVAN": [
+        "IVAN_DPTH"
+    ],
+    "LBST": [
+        "SAMP_TOP"
+    ],
+    "LDEN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LDYN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LFCN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LLIN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LLPL": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LNMC": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LOCA": [
+        "LOCA_FDEP"
+    ],
+    "LPDN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LPEN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LRES": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LSLT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LSTG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LSTT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "LSWL": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LTCH": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LUCT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "LVAN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "MCVG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "MCVT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "PLTG": [
+        "PLTG_DPTH"
+    ],
+    "PLTT": [
+        "PLTG_DPTH"
+    ],
+    "PMTD": [
+        "PMTG_DPTH"
+    ],
+    "PMTG": [
+        "PMTG_DPTH"
+    ],
+    "PMTL": [
+        "PMTG_DPTH"
+    ],
+    "PTIM": [
+        "PTIM_DPTH",
+        "PTIM_CAS"
+    ],
+    "PTST": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "PUMT": [
+        "PUMT_DPTH"
+    ],
+    "RCAG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RCAT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "RCCV": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RDEN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RELD": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RESC": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "RESD": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "RESG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RESP": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "RESS": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "RPLT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RSCH": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RSHR": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RTEN": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RUCS": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "RWCO": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "SAMP": [
+        "SAMP_TOP",
+        "SAMP_BASE",
+        "SAMP_WDEP"
+    ],
+    "SCDG": [
+        "SCDG_DPTH"
+    ],
+    "SCDT": [
+        "SCDG_DPTH"
+    ],
+    "SCPP": [
+        "SCPP_TOP",
+        "SCPP_BASE"
+    ],
+    "SCPT": [
+        "SCPT_DPTH"
+    ],
+    "SHBG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "SHBT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "SUCT": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "TNPC": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "TREG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "TRET": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "TRIG": [
+        "SAMP_TOP",
+        "SPEC_DPTH",
+        "SPEC_BASE"
+    ],
+    "TRIT": [
+        "SAMP_TOP",
+        "SPEC_DPTH"
+    ],
+    "WADD": [
+        "WADD_TOP",
+        "WADD_BASE"
+    ],
+    "WETH": [
+        "WETH_TOP",
+        "WETH_BASE"
+    ],
+    "WGPG": [
+        "WGPG_STRT",
+        "WGPG_STOP",
+        "WGPG_BHD"
+    ],
+    "WGPT": [
+        "WGPT_DPTH"
+    ],
+    "WSTD": [
+        "WSTG_DPTH",
+        "WSTD_POST"
+    ],
+    "WSTG": [
+        "WSTG_DPTH",
+        "WSTG_SEAL",
+        "WSTG_CAS"
+    ]
+}
