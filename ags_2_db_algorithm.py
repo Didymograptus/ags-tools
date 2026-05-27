@@ -35,13 +35,15 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QVariant
 from qgis.core import (QgsApplication,
                        QgsSettings,
                        QgsProcessingAlgorithm,
+                       QgsProcessingParameterEnum,
                        QgsProcessingParameterFile,
                        QgsProcessingParameterFileDestination,
                        QgsProcessingParameterBoolean,
-                       QgsProcessingParameterString,
                        QgsProcessingParameterCrs,
+                       QgsProcessingParameterString,
                        QgsCoordinateReferenceSystem,
                        QgsVectorLayer,
+                       QgsRasterLayer,
                        QgsField,
                        QgsFields,
                        QgsFeature,
@@ -53,25 +55,20 @@ from qgis.core import (QgsApplication,
                        QgsProcessingException,
                        QgsDataSourceUri,
                        QgsMapLayer,
-                       QgsProviderRegistry
+                       QgsProviderRegistry,
+                       QgsDataProvider,
+                       QgsLayerTreeLayer
                         )
-
-from qgis.utils import iface
+from datetime import datetime
 from io import StringIO
-# import sqlite3
+import json
 import os
-import pandas as pd
+import re
+import shutil
+import sqlite3
 from pathlib import Path
-
-if __package__:
-
-    from .ags_utils.parser import AGSParser
-    from .ags_utils.transformer import AGSTransformer
-    from .ags_utils.exporter import CSVExporter
-else:
-    from ags_utils.parser import AGSParser
-    from ags_utils.transformer import AGSTransformer
-    from ags_utils.exporter import CSVExporter
+from qgis.utils import iface
+from osgeo import ogr
 
 
 class AGS2DBAlgorithm(QgsProcessingAlgorithm):
@@ -93,13 +90,14 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
     # calling from the QGIS console.
 
     OUTPUT = 'OUTPUT'
+    OUTPUTFOLDER = 'OUTPUTFOLDER'
+    SAMEFOLDER = 'SAMEFOLDER'
     INPUT = 'INPUT'
-    DATA_DESC = 'DATA_DESC'
     CRS = 'CRS'
-    EXPORT_CSV = 'EXPORT_CSV'
-    CSV_OUTPUT_DIR = 'CSV_OUTPUT_DIR'
-    CSV_OUTPUT_FOLDER_NAME = 'CSV_OUTPUT_FOLDER_NAME'
-    CSV_APPEND_MODE = 'CSV_APPEND_MODE'
+    QML = 'QML'
+    BASEMAP = 'BASEMAP'
+    GEOLOGYMAPS = 'GEOLOGYMAPS'
+    USER = 'USER'
 
     def initAlgorithm(self, config):
         """
@@ -109,27 +107,21 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         # We add the input vector features source. It can have any kind of
         # geometry.
+
+
         self.addParameter(
             QgsProcessingParameterFile(
                 self.INPUT,
-                self.tr('Input AGS file(s)'),
+                self.tr('Input File'),
+                fileFilter='AGS (*.ags)'
 
             )
         )
 
-        self.addParameter(
-            QgsProcessingParameterCrs(
-                self.CRS,
-                self.tr('Coordinate reference system'),
-                defaultValue=QgsCoordinateReferenceSystem('EPSG:27700')
-            )
-        )
-
-        # Use FileDestination parameter for proper "Save As" dialog
         self.addParameter(
             QgsProcessingParameterFileDestination(
                 self.OUTPUT,
-                self.tr('Output Database File'),
+                self.tr('Output File'),
                 fileFilter='GeoPackage (*.gpkg);;SpatiaLite (*.sqlite)'
 
             )
@@ -137,62 +129,83 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         self.addParameter(
             QgsProcessingParameterString(
-                self.DATA_DESC,
-                self.tr('Description of proposed use of data'),
-                defaultValue='',
-                optional=True
+                self.USER,
+                self.tr('Initials or name of user, skip to use the system login name'),
+                optional = True
+
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterCrs(
+                self.CRS,
+                'Coordinate Reference System',
+                defaultValue=QgsCoordinateReferenceSystem('EPSG:27700')
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFile(
+                self.QML,
+                self.tr('Style File'),
+                fileFilter='QML (*.qml)',
+                optional = True
             )
         )
 
         self.addParameter(
             QgsProcessingParameterBoolean(
-                self.EXPORT_CSV,
-                self.tr('\nCreate CSV Files for plotting in PowerBI'),
-                defaultValue=False
+                self.SAMEFOLDER,
+                self.tr('Use same folder as AGS file'),
+                defaultValue = True,
+                optional = True
             )
         )
 
-        csv_output_dir_param = QgsProcessingParameterFile(
-            self.CSV_OUTPUT_DIR,
-            self.tr('Output CSV Database Folder (existing or new)'),
-            behavior=QgsProcessingParameterFile.Folder,
-            optional=True
-        )
-        csv_output_dir_param.setMetadata({
-            'widget_wrapper': {
-                'depends_on': self.EXPORT_CSV,
-                'depends_on_value': True
-            }
-        })
-        self.addParameter(csv_output_dir_param)
+        # We add a feature sink in which to store our processed features (this
+        # usually takes the form of a newly created vector layer when the
+        # algorithm is run in QGIS).
 
-        csv_output_folder_name_param = QgsProcessingParameterString(
-            self.CSV_OUTPUT_FOLDER_NAME,
-            self.tr('Folder name of CSV database (leave blank if appending to existing folder)'),
-            defaultValue='',
-            optional=True
-        )
-        csv_output_folder_name_param.setMetadata({
-            'widget_wrapper': {
-                'depends_on': self.EXPORT_CSV,
-                'depends_on_value': True
-            }
-        })
-        self.addParameter(csv_output_folder_name_param)
+        # self.addParameter(
+            # QgsProcessingParameterFileDestination(
+                # self.OUTPUTFOLDER,
+                # self.tr('Output Folder')
+            # )
+        # )
 
-        csv_append_param = QgsProcessingParameterBoolean(
-            self.CSV_APPEND_MODE,
-            self.tr('Append to existing CSV files'),
-            defaultValue=False,
-            optional=True
+
+        self.addParameter(
+            QgsProcessingParameterBoolean(
+                self.BASEMAP,
+                self.tr('Include Google map basemap'),
+                defaultValue = True,
+                optional = False
+            )
         )
-        csv_append_param.setMetadata({
-            'widget_wrapper': {
-                'depends_on': self.EXPORT_CSV,
-                'depends_on_value': True
-            }
-        })
-        self.addParameter(csv_append_param)
+        # list shown in dropdown in GUI
+        self.mypredicatelist = [
+                                '1m Lidar DTM',
+                                'BGS Hydrogeology',
+                                'Bedrock',
+                                'Superficial deposits',
+                                'Artificial ground',
+                                'Mass movement',
+                                'BGS Boreholes',
+                                'BGS AGS Boreholes',
+                                ]
+
+        # self.mypredicatedefaultvalues = [2]
+        self.addParameter(
+            QgsProcessingParameterEnum(
+            self.GEOLOGYMAPS,
+            self.tr('Geology and DTM maps'),
+            self.mypredicatelist,
+            defaultValue = None, # self.mypredicatedefaultvalues,
+            allowMultiple = True,
+            optional = True
+            )
+        )
+
 
     def parse_ags_file(self, file_contents):
 
@@ -328,7 +341,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             y_val = record.get(y_field)
             if x_val is None or x_val.strip() == '' or y_val is None or y_val.strip() == '':
                 # No coordinates for this feature
-                feedback.pushInfo(f"LOCA feature missing coordinates: {record}")
+#                feedback.pushInfo(f"LOCA feature missing coordinates: {record}")
                 # We still add the feature but without geometry
 
                 f = QgsFeature()
@@ -360,16 +373,79 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         return layer
 
-    def create_database_connection(self, output_path, feedback):
+    def create_database_connection(self, gpkg_filepath, feedback):
         # Only works for gpkg
         md = QgsProviderRegistry.instance().providerMetadata("ogr")
-        conn = md.createConnection(output_path, {})
-        conn_name = os.path.splitext(os.path.basename(output_path))[0]
+        conn = md.createConnection(gpkg_filepath, {})
+        conn_name = os.path.splitext(os.path.basename(gpkg_filepath))[0]
         md.saveConnection(conn, conn_name)
-
-
         # Refresh database connections in the Browser Panel
-        iface.browserModel().refresh()
+        iface.browserModel().reload()
+
+
+    def add_meta_and_version_tables(self, ags_filepath, gpkg_filepath, user, feedback):
+        """add new tables to help version control of data set
+        As well as the table, the schema needs to be updated and
+        it would be useful to add some data"""
+        datetime_now = datetime.now()
+        ags_file = Path(ags_filepath).stem
+
+        create_cct_sql = ('CREATE TABLE "change_control" ( '
+                            '"id"    INTEGER, '
+                            '"description"   TEXT, '
+                            '"purpose"   TEXT, '
+                            '"datetime"  TEXT, '
+                            '"authored_by"   TEXT, '
+                            '"reviewed_by"   TEXT, '
+                            'PRIMARY KEY("id" AUTOINCREMENT)'
+                            ')')
+
+        create_sdt_sql = ('CREATE TABLE "source_data" ( '
+                            '"id"    INTEGER, '
+                            '"ags_file_name" TEXT, '
+                            '"geopackage_created_by" TEXT, '
+                            '"geopackage_created_datetime"   TEXT, '
+                            'PRIMARY KEY("id" AUTOINCREMENT)'
+                            ')')
+
+        cc_data_sql = 'INSERT INTO change_control values (?,?,?,?,?,?)'
+        sd_data_sql = 'INSERT INTO source_data values (?,?,?,?)'
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute(create_cct_sql)
+                cursor.execute(create_sdt_sql)
+            conn.commit()
+            feedback.pushInfo("Added version control tables")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) VALUES('change_control', 'attributes', 'change_control', '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0, 0, 0, 0, 0);")
+                cursor.execute("INSERT INTO gpkg_contents (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id) VALUES('source_data', 'attributes', 'source_data', '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0, 0, 0, 0, 0);")
+                cursor.execute("INSERT INTO gpkg_ogr_contents (table_name, feature_count) VALUES('source_data', 1);")
+                cursor.execute("INSERT INTO gpkg_ogr_contents (table_name, feature_count) VALUES('Change_control', 1);")
+                feedback.pushInfo("contents1 done")
+            conn.commit()
+            feedback.pushInfo("Added data to contents")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        try:
+            with sqlite3.connect(gpkg_filepath) as conn:
+                cursor = conn.cursor()
+                cursor.execute(cc_data_sql,(0, "Initial creation", "For review", datetime_now, user, None))
+                cursor.execute(sd_data_sql, (0, ags_file, user, datetime_now))
+            conn.commit()
+            feedback.pushInfo("Added data to version control tables")
+        except sqlite3.OperationalError as e:
+            print(e)
+
+        conn.close()
+        feedback.pushInfo("Control tables updated")
 
     def add_svg_paths(self, feedback):
 
@@ -380,41 +456,215 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             QgsApplication.setDefaultSvgPaths(svg_paths)
             feedback.pushInfo("Added custom SVG path for symbols.")
 
-    def loadLayerAndApplyStyle(self, output_path, table_name, qml_path, feedback):
-        # Load the layer using OGR provider. GPK and SpatiaLite are supported.
+    # def loadLayerAndApplyStyle(self, output_path, table_name, qml_path, feedback):
+        # # Load the layer using OGR provider. GPK and SpatiaLite are supported.
 
-        layer_path = f"{output_path}|layername={table_name}"
-        layer = QgsVectorLayer(layer_path, table_name, "ogr")
+        # layer_path = f"{output_path}|layername={table_name}"
+        # layer = QgsVectorLayer(layer_path, table_name, "ogr")
 
-        if not layer.isValid():
-            feedback.pushInfo(f"Table '{table_name}' cannot be added.")
+        # if not layer.isValid():
+            # feedback.pushInfo(f"Table '{table_name}' cannot be added.")
+            # return None
+
+        # QgsProject.instance().addMapLayer(layer)
+        # feedback.pushInfo(f"Added '{table_name}' layer to the project.")
+
+        # if layer.isValid() and os.path.exists(qml_path):
+            # layer.loadNamedStyle(qml_path)
+            # layer.triggerRepaint()
+            # feedback.pushInfo("Applied QML style to the LOCA layer.")
+
+        # if iface:
+            # iface.layerTreeView().refreshLayerSymbology(layer.id())
+
+        # return layer
+
+
+    def add_elev_calc_col(self, db_fpath: str, table_name: str, depth_col_names:list, feedback, col_name_loca_gl = 'LOCA_GL'):
+        """adds calculated column (elevation) to existing table"""
+
+
+        conn = sqlite3.connect(db_fpath)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        listOfTables = list(list(zip(*cursor.fetchall()))[0])
+
+        if table_name not in listOfTables:
+            print(f"table {table_name} does not exist")
+            conn.close()
+            return None
+        if table_name == 'LOCA':
             return None
 
-        QgsProject.instance().addMapLayer(layer)
-        feedback.pushInfo(f"Added '{table_name}' layer to the project.")
+        print(f"{table_name = }")
 
-        if layer.isValid() and os.path.exists(qml_path):
-            layer.loadNamedStyle(qml_path)
-            layer.triggerRepaint()
-            feedback.pushInfo("Applied QML style to the LOCA layer.")
+        qry_dict_loca = f"SELECT distinct lOCA_ID, LOCA_GL FROM LOCA;"
+        cursor.execute(qry_dict_loca)
+        dct_res_qry = dict(cursor.fetchall())
 
-        if iface:
-            iface.layerTreeView().refreshLayerSymbology(layer.id())
+        filtered_dct_loca_gl = {loca_id: loca_gl for loca_id, loca_gl in dct_res_qry.items() if loca_gl != None}
 
-        return layer
+        qry_lst_loca = f"SELECT distinct lOCA_ID FROM {table_name};"
+
+        cursor.execute(qry_lst_loca)
+        res_qry_list = list(list(zip(*cursor.fetchall()))[0])
+
+        dct_filtered_data = {loca_id: filtered_dct_loca_gl[loca_id] for loca_id in res_qry_list if loca_id in filtered_dct_loca_gl}
+
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name_loca_gl} REAL")
+
+        for key, value in dct_filtered_data.items():
+            qry = f"UPDATE {table_name} SET LOCA_GL = {value} WHERE LOCA_ID = '{key}';"
+            cursor.execute(qry)
+
+        for col_name in depth_col_names:
+            print(f"{table_name = }")
+
+            print(f"{col_name = }")
+            try:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name}_GL REAL GENERATED ALWAYS AS ({col_name_loca_gl} - {col_name})")
+            except:
+                print(f"heading {col_name} not found")
+
+        conn.commit()
+
+        conn.close()
+
+    def ApplyStyle(self, layer_name, qml_path, feedback):
+        # Load the layer using OGR provider. GPK and SpatiaLite are supported.
+
+        layer = QgsProject.instance().mapLayersByName(layer_name)
+
+        try:
+            if layer[0] and os.path.exists(qml_path):
+                layer[0].loadNamedStyle(qml_path)
+                layer[0].triggerRepaint()
+                feedback.pushInfo("Applied QML style to the LOCA layer.")
+        except:
+                feedback.pushInfo("QML style failed to apply to the LOCA layer.")
+
+
+    def load_all_layers(self, gpkg_path):
+        # load all layers
+        project = QgsProject.instance()
+
+        layer = QgsVectorLayer(gpkg_path, "test", "ogr")
+        subLayers = layer.dataProvider().subLayers()
+
+        root = QgsProject.instance().layerTreeRoot()
+        ags_fname = Path(gpkg_path).stem
+        agsGroup = root.addGroup(ags_fname)
+
+
+
+        for subLayer in subLayers:
+            lyr_name = subLayer.split(QgsDataProvider.SUBLAYER_SEPARATOR)[1]
+            uri = f"{gpkg_path}|layername={lyr_name}"
+            # Create layer
+            sub_vlayer = QgsVectorLayer(uri, lyr_name, 'ogr') # this is the place to map names if needed
+            # Add layer to map in group))
+            agsGroup.insertChildNode(-1,QgsLayerTreeLayer(QgsProject.instance().addMapLayer(sub_vlayer, False)))
+
+
+    def copy_files(self, parameters, context, output_path, feedback):
+        ags_file_path = self.parameterAsFile(parameters, self.INPUT, context)
+        ags_file_stem = Path(ags_file_path).stem
+        ags_parent = Path(ags_file_path).parents[0]
+        # add date-time
+        now = datetime.now()
+        str_date_time = now.strftime("%m-%d-%H_%M")
+
+        output_perm_folder = str(ags_parent) + "/" + str_date_time + "_" + ags_file_stem + '.gpkg'
+        feedback.pushInfo(f"output_perm_folder: {output_perm_folder}")
+
+        if self.parameterAsFile(parameters, self.SAMEFOLDER, context) == 'true':
+            src = output_path
+            dst = output_perm_folder
+            feedback.pushInfo(f"source: {src}")
+            feedback.pushInfo(f"dst: {dst}")
+            # copy temp file to perm location
+            shutil.copyfile(src, dst)
+            feedback.pushInfo(f"file copied from: {src} to {dst}")
+        return output_perm_folder
+
+
+    def loadXYZ(self, url, name):
+        rasterLyr = QgsRasterLayer("type=xyz&url=" + url, name, "wms")
+        QgsProject.instance().addMapLayer(rasterLyr, False)
+        # obtain the layer tree of the top-level group in the project
+        layerTree = iface.layerTreeCanvasBridge().rootGroup()
+        # the position is a number starting from 0, with -1 an alias for the end
+        layerTree.insertChildNode(-1, QgsLayerTreeLayer(rasterLyr))
+
+
+    def loadBGSwms(self, layer_index: int):
+        """Plots a layer onto the map. Applies transparency to make it easier
+        to read
+
+        Parameters
+        --------
+        layer_index: int
+            index of layer selected in list
+
+        Returns
+        --------
+            BGS layer on map
+
+        """
+
+        lst_maps = ['Bedrock',
+                    'Superficial deposits',
+                    'Mass movement',
+                    'Artificial ground']
+
+        str_layer = self.mypredicatelist[layer_index]
+        uri_layer = str_layer.replace(" ", ".") # required for url
+        if str_layer == '1m Lidar DTM':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Lidar_Composite_DTM_1m&styles&tilePixelRatio=0&url=https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?version%3D1.3.0")
+        elif str_layer == 'BGS Hydrogeology':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Hydrogeology&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/hydrogeology/MapServer/WmsServer")
+        elif str_layer in lst_maps:
+            urlWithParams = (f"crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=BGS.50k.{uri_layer}&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/BGS_Detailed_Geology/MapServer/WMSServer&http-header:referer=")
+        elif str_layer == 'BGS AGS Boreholes':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Boreholes&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/AGS/AGS_Export/MapServer/WMSServer")
+        elif str_layer == 'BGS Boreholes':
+            urlWithParams = ("crs=EPSG:27700&dpiMode=7&featureCount=10&format=image/png&layers=Borehole.records&styles&tilePixelRatio=0&url=https://map.bgs.ac.uk/arcgis/services/GeoIndex_Onshore/boreholes/MapServer/WmsServer")
+
+
+        rlayer = QgsRasterLayer(urlWithParams, str_layer, 'wms')
+        if 'Boreholes' not in str_layer:
+            rlayer.renderer().setOpacity(0.4)
+        QgsProject.instance().addMapLayer(rlayer)
+
+
+    def group_view(self, gpkg_path, view):
+        name = Path(gpkg_path).stem
+        root = QgsProject.instance().layerTreeRoot()
+        group = root.findGroup(name)
+        group.setExpanded(view)
+        # clone the group
+        cloned_group = group.clone()
+        # move the node (along with sub-groups and layers) to the top
+        root.insertChildNode(0, cloned_group)
+        # remove the original node
+        root.removeChildNode(group)
+
 
     def processAlgorithm(self, parameters, context, feedback):
         # Define the output path
-        output_path = self.parameterAsString(parameters, self.OUTPUT, context)
-        if not output_path:
-            raise QgsProcessingException("DB output file is required.")
+        output_path = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
         ext = os.path.splitext(output_path)[1].lower()
-        feedback.pushInfo(f"Writing all groups GeoPackage to: {output_path}")
+#        feedback.pushInfo(f"Writing all groups GeoPackage to: {output_path}")
+
+        if self.parameterAsString(parameters, self.USER, context):
+            user = self.parameterAsString(parameters, self.USER, context)
+        else:
+            user =os.getlogin( )
 
         # Remove existing GeoPackage if it exists
         if os.path.exists(output_path):
             os.remove(output_path)
-            feedback.pushInfo(f"Removed existing GeoPackage at: {output_path}")
+#            feedback.pushInfo(f"Removed existing GeoPackage at: {output_path}")
 
         # Load AGS4 file contents
         ags_file_path = self.parameterAsFile(parameters, self.INPUT, context)
@@ -423,40 +673,9 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         # Get chosen CRS
         crs = self.parameterAsCrs(parameters, self.CRS, context)
-        data_desc = self.parameterAsString(parameters, self.DATA_DESC, context)
-        data_desc = (data_desc or '').strip()
 
         # Parse the AGS file
         data, column_types = self.parse_ags_file(file_contents)
-
-        ags_filename = Path(ags_file_path).name
-        db_filename = Path(output_path).name
-        proj_id = ''
-        if 'PROJ' in data:
-            for record in data['PROJ']:
-                proj_val = str(record.get('PROJ_ID', '') or '').strip()
-                if proj_val:
-                    proj_id = proj_val
-                    break
-
-        # For AGS2DB, source_file format: ags_filename|db_filename|project_id
-        # This provides full traceability: where data came from (AGS), where it went (DB), and what project
-        source_file_value = f"{ags_filename}|{db_filename}|{proj_id}" if proj_id else f"{ags_filename}|{db_filename}"
-
-        # Ensure provenance fields exist across all DB tables
-        for group_name, records in data.items():
-            if group_name.endswith("_units"):
-                continue
-            column_types.setdefault(group_name, {})['source_file'] = 'TEXT'
-            for record in records:
-                if not str(record.get('source_file', '') or '').strip():
-                    record['source_file'] = source_file_value
-
-        # Inject user-supplied description into PROJ records for DB output.
-        if 'PROJ' in data:
-            for record in data['PROJ']:
-                record['data_desc'] = data_desc
-            column_types.setdefault('PROJ', {})['data_desc'] = 'TEXT'
 
         first_layer = True
         transform_context = context.transformContext()
@@ -465,7 +684,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             if group_name.endswith("_units"):
                 continue  # Skip unit tables
 
-            feedback.pushInfo(f"Processing group: {group_name}")
+#            feedback.pushInfo(f"Processing group: {group_name}")
 
             if group_name.upper() == "LOCA":
                 # Create spatial LOCA layer
@@ -517,9 +736,9 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             # Geometry type will be derived automatically for V3 method
 
             if first_layer:
-                options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
+                options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
             else:
-                options.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteLayer
+                options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
 
             error, newFilename, newLayer, errorMessage = QgsVectorFileWriter.writeAsVectorFormatV3(
                 layer,
@@ -528,7 +747,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
                 options
             )
 
-            if error == QgsVectorFileWriter.WriterError.NoError:
+            if error == QgsVectorFileWriter.NoError:
                 feedback.pushInfo(f"Successfully transformed group '{group_name}' to GeoPackage.")
             else:
                 feedback.reportError(f"Error transforming group '{group_name}' to GeoPackage: {errorMessage}")
@@ -537,89 +756,62 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo("ALL GROUPS WRITTEN - DB CREATED")
 
+        # add version control tables
+        feedback.pushInfo("Adding version control tables")
+        self.add_meta_and_version_tables(ags_file_path, output_path, user, feedback)
+        feedback.pushInfo("Version control bales complete")
+
+        # Add elevation data to tables
+        feedback.pushInfo("Adding elevation data")
+        json_data_path = os.path.join(os.path.dirname(__file__), 'data', 'elev_groups_heads.json')
+        with open(json_data_path) as f:
+            params = json.load(f)
+        for key, value in params.items():
+            self.add_elev_calc_col(output_path, key, value, feedback)
+        feedback.pushInfo("Elevation data complete")
+
         # After the writing is done, call the helper functions:
         self.add_svg_paths(feedback)
 
-        qml_path = os.path.join(os.path.dirname(__file__), 'styles', 'loca_spatial.qml')
+        if self.parameterAsFile(parameters, self.QML, context) != '':
+            qml_path = self.parameterAsFile(parameters, self.QML, context)
+            feedback.pushInfo(f"{qml_path = }")
+        else:
+            qml_path = os.path.join(os.path.dirname(__file__), 'styles', 'loca_spatial.qml')
+            feedback.pushInfo(f"{qml_path = }")
+        # Create geology maps
+        feedback.pushInfo(f"GEOLOGYMAPS: {self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context)}")
+        for index in self.parameterAsEnums(parameters, self.GEOLOGYMAPS, context):
+            self.loadBGSwms(index)
+        # create basemap
+        if self.parameterAsFile(parameters, self.BASEMAP, context) == 'true':
+            urlWithParams = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            self.loadXYZ(urlWithParams, 'Open Streetmap')
 
-        # Load and style the LOCA layer
-        self.loadLayerAndApplyStyle(output_path, "LOCA", qml_path, feedback)
+        # Copy the file from its temp location
+        new_output_path = self.copy_files(parameters, context, output_path, feedback)
+        self.create_database_connection(new_output_path, feedback)
+        self.load_all_layers(new_output_path)
+        self.ApplyStyle('LOCA', qml_path, feedback)
+        self.group_view(new_output_path, False)
+        proj = QgsProject.instance()
+        proj.setCrs(QgsCoordinateReferenceSystem(27700))
+        # zoom map to LOCA layer
+        vlayer = QgsVectorLayer(new_output_path, "LOCA", "ogr")
+        canvas = iface.mapCanvas()
+        canvas.setExtent(vlayer.extent())
+        canvas.refresh()
 
-        self.create_database_connection(output_path, feedback)
-
-        # ====== CSV EXPORT (conditional) ======
-        export_csv = self.parameterAsBool(parameters, self.EXPORT_CSV, context)
-        if export_csv:
-            csv_parent_dir = self.parameterAsString(parameters, self.CSV_OUTPUT_DIR, context)
-            csv_output_folder_name = self.parameterAsString(parameters, self.CSV_OUTPUT_FOLDER_NAME, context)
-            append_mode = self.parameterAsBool(parameters, self.CSV_APPEND_MODE, context)
-
-            if not csv_parent_dir:
-                raise QgsProcessingException("CSV export enabled but no parent folder specified.")
-
-            folder_name = (csv_output_folder_name or "").strip()
-            if folder_name:
-                csv_output_dir = os.path.join(csv_parent_dir, folder_name)
-            else:
-                # If appending, use selected folder directly; otherwise create default subfolder.
-                if append_mode:
-                    csv_output_dir = csv_parent_dir
-                else:
-                    csv_output_dir = os.path.join(csv_parent_dir, 'ags_csv_export')
-
-            # Determine overwrite/append behavior from explicit user selection
-            if os.path.exists(csv_output_dir):
-                csv_files = [f for f in os.listdir(csv_output_dir) if f.endswith('.csv')]
-                if csv_files:
-                    if append_mode:
-                        feedback.pushInfo("Appending to existing CSVs...")
-                    else:
-                        feedback.pushInfo("Overwriting existing CSVs...")
-            else:
-                if append_mode:
-                    feedback.pushInfo("Append mode selected, but no existing CSV folder found. New CSV files will be created.")
-
-            feedback.pushInfo(f"Exporting AGS to CSV folder: {csv_output_dir}")
-
-            try:
-                # Parse AGS file
-                parser = AGSParser(ags_file_path)
-                parser.load()
-                feedback.pushInfo("AGS file loaded for CSV export")
-
-                # Transform and export
-                source_file = Path(ags_file_path).name
-                transformer = AGSTransformer(parser, source_file, data_desc=data_desc)
-                exporter = CSVExporter(csv_output_dir, append_mode=append_mode)
-
-                # Dynamically discover all exportable groups from the AGS file.
-                tables = transformer.available_tables()
-
-                for table in tables:
-                    if feedback.isCanceled():
-                        feedback.pushInfo("CSV export cancelled by user.")
-                        break
-
-                    try:
-                        df = transformer.transform_table(table)
-                        exporter.write(table, df, source_file)
-                        feedback.pushInfo(f"Transformed {table}.csv ({len(df)} rows)")
-                    except Exception as e:
-                        feedback.reportError(f"Error transforming {table}: {str(e)}")
-
-                exporter.write_manifest()
-                feedback.pushInfo("CSV export complete - created manifest.csv")
-
-            except Exception as e:
-                feedback.reportError(f"CSV export failed: {str(e)}")
-
-        return {self.OUTPUT: output_path}
+        return {self.OUTPUT: new_output_path}
 
     def processing_log(self, message):
         """
         Logs a message to the Processing log.
         """
         self.logMessage(message)
+
+    def flags(self):
+        return QgsProcessingAlgorithm.FlagNoThreading
 
     def name(self):
         """

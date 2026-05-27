@@ -6,7 +6,7 @@
 
 import pandas as pd
 from .geo_utils import bng_to_wgs84
-from ..expected_groups import (
+from .expected_groups import (
     GROUPS_WITH_SAMP_ID,
     ELEVATION_DEPTH_COLUMNS,
     GEOLOGY_INTERVAL_DEPTH_COLUMNS,
@@ -172,7 +172,7 @@ class AGSTransformer:
         Generic pass-through: takes all columns from the raw AGS DataFrame,
         drops FILE_FSET, injects source_file and any extra_cols, then
         injects elevation and filter columns.
-        
+
         Column order is not enforced — raw AGS column order is preserved.
         """
         out = df.copy()
