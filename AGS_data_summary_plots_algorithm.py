@@ -140,41 +140,44 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f"stage={str_stage}")
         feedback.pushInfo(f"status={str_status}")
         dst = parameters['OUTPUT']
-        # TODO access geopackage using sqlite3
         conn = sqlite3.connect(database)
         cur = conn.cursor()
-        cur.execute('select * from ISPT where LOCA_ID = "BH504"')
-        rows = cur.fetchall()
+        # cur.execute('select * from ISPT where LOCA_ID = "BH504"')
+        # rows = cur.fetchall()
 
-        for row in rows:
-            feedback.pushInfo(f"Result={row}")
+        # for row in rows:
+            # feedback.pushInfo(f"Result={row}")
 
         # fetch project details
-        qry_proj = """select PROJ_NAME, PROJ_CLNT from PROJ"""
-        cur.execute(qry_proj)
-        res = cur.fetchone()
-        proj_name = res[0]
-        proj_clnt = res[1]
-        feedback.pushInfo(f"Result={res}")
-        # fetch file transmission details
-        qry_tran = """select TRAN_PROD, TRAN_STAT, TRAN_DATE from TRAN"""
-        cur.execute(qry_tran)
-        res = cur.fetchone()
-        tran_prod = res[0]
-        tran_stat = res[1]
-        tran_date = res[2]
-        feedback.pushInfo(f"Result={res}")
+        try:
+            qry_proj = """select PROJ_NAME, PROJ_CLNT from PROJ"""
+            cur.execute(qry_proj)
+            res = cur.fetchone()
+            proj_name = res[0]
+            proj_clnt = res[1]
+            feedback.pushInfo(f"Result={res}")
+            # fetch file transmission details
+            qry_tran = """select TRAN_PROD, TRAN_STAT, TRAN_DATE from TRAN"""
+            cur.execute(qry_tran)
+            res = cur.fetchone()
+            tran_prod = res[0]
+            tran_stat = res[1]
+            tran_date = res[2]
+            feedback.pushInfo(f"Result={res}")
+            # create common metadata subtitle
+            # use 'sup' because plotly version in QGIS does not support subtitle
+            str_cht_meta = (f"<br><br><sup>Project Name: <b>{proj_name}</b><br> "
+                            f"GeoPackage Filename: <b>{database_fname}</b> <br> "
+                            f"Project stage/purpose: <b>{str_stage}</b> "
+                            f"Chart status: <b>{str_status}</b> "
+                            f"Date/time created: <b>{str_date_time}</b></sup>")
 
-        # create common metadata subtitle
-        # use 'sup' because plotly version in QGIS does not support subtitle
-        str_cht_meta = (f"<br><br><sup>Project Name: <b>{proj_name}</b><br> "
-                        f"GeoPackage Filename: <b>{database_fname}</b> <br> "
-                        f"Project stage/purpose: <b>{str_stage}</b> "
-                        f"Chart status: <b>{str_status}</b> "
-                        f"Date/time created: <b>{str_date_time}</b></sup>")
+            title_hor_align = 0.5
+            top_margin = 230
+        except:
+            feedback.pushInfo(f"Project and/or transmission details not in file.")
 
-        title_hor_align = 0.5
-        top_margin = 230
+
 
         # =================SPT -Depth==================================
         # create dataframe - link geology codes
@@ -184,53 +187,57 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             from ISPT left join GEOL ON ISPT.LOCA_ID = GEOL.LOCA_ID
             where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE
             order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
+        try:
+            df = pd.read_sql_query(qry, conn)
 
-        feedback.pushInfo(f"Result = {df}")
+            feedback.pushInfo(f"Result = {df}")
 
-        # need to plot nulls as 50 where non full penetration
-        # reported result visble in hover
-        df["ISPT_NVAL"] = df["ISPT_NVAL"].fillna(50)
+            # need to plot nulls as 50 where non full penetration
+            # reported result visble in hover
+            df["ISPT_NVAL"] = df["ISPT_NVAL"].fillna(50)
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create SPT vs depth multi plots
-        fig = px.scatter(
-            df,
-            x='ISPT_NVAL',
-            y='ISPT_TOP',
-            height=1600,
-            facet_col='GEOL_GEOL',
-            color='LOCA_ID',
-            labels={"ISPT_NVAL": "SPT 'N' value",
-                    "ISPT_TOP": "Depth (mbgl)",
-                    "GEOL_GEOL": "Geology code",
-                    "LOCA_ID": "EXPL Hole",
-                    "ISPT_REP": "Reported value"
-                    },
+            # Create SPT vs depth multi plots
+            fig = px.scatter(
+                df,
+                x='ISPT_NVAL',
+                y='ISPT_TOP',
+                height=1600,
+                facet_col='GEOL_GEOL',
+                color='LOCA_ID',
+                labels={"ISPT_NVAL": "SPT 'N' value",
+                        "ISPT_TOP": "Depth (mbgl)",
+                        "GEOL_GEOL": "Geology code",
+                        "LOCA_ID": "EXPL Hole",
+                        "ISPT_REP": "Reported value"
+                        },
 
-            hover_data=["ISPT_REP"],
-            facet_col_wrap=4
-        )
-        fig.update_layout(title_text=f"""<b>SPT vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(xaxis_range=[0, 55])
-        fig.update_layout(yaxis_range=[0, 35])
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=12,
-                                      line=dict(width=2,
-                                                color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
-        fig.update_yaxes(autorange='reversed')
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+                hover_data=["ISPT_REP"],
+                facet_col_wrap=4
+            )
+            fig.update_layout(title_text=f"""<b>SPT vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(xaxis_range=[0, 55])
+            fig.update_layout(yaxis_range=[0, 35])
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=12,
+                                          line=dict(width=2,
+                                                    color='DarkSlateGrey')),
+                              selector=dict(mode='markers'))
+            fig.update_yaxes(autorange='reversed')
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
-        fig.write_html(dst+'/'+'SPTvsDepth.html')
-        webbrowser.open_new_tab(dst+'/'+'SPTvsDepth.html')
+            fig.write_html(dst+'/'+'SPTvsDepth.html')
+            webbrowser.open_new_tab(dst+'/'+'SPTvsDepth.html')
+
+        except:
+            feedback.pushInfo(f"No SPT data to plot, output skipped")
 
         # =================SPT -Elevation==================================
         # create dataframe - link geology codes
@@ -244,50 +251,54 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE) as SUB
             left join LOCA on SUB.LOCA_ID = LOCA.LOCA_ID
             order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
-        feedback.pushInfo(f"Result = {df}")
+        try:
+            df = pd.read_sql_query(qry, conn)
+            feedback.pushInfo(f"Result = {df}")
 
-        # Plot nulls as 50 where non full pen reported result visble in hover
-        df["ISPT_NVAL"] = df["ISPT_NVAL"].fillna(50)
+            # Plot nulls as 50 where non full pen reported result visble in hover
+            df["ISPT_NVAL"] = df["ISPT_NVAL"].fillna(50)
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create SPT vs depth multi plots
-        fig = px.scatter(
-            df,
-            x='ISPT_NVAL',
-            y='ISPT_ELEV',
-            height=1600,
-            facet_col='GEOL_GEOL',
-            color='LOCA_ID',
-            labels={"ISPT_NVAL": "SPT 'N' value",
-                    "ISPT_ELEV": "Elevation (mAOD)",
-                    "GEOL_GEOL": "Geology code",
-                    "LOCA_ID": "EXPL Hole",
-                    "ISPT_REP": "Reported value"
-                    },
-            hover_data=["ISPT_REP"],
-            facet_col_wrap=4
-            )
-        fig.update_layout(title_text=f"""<b>SPT vs Elevation by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(xaxis_range=[0, 55])
-        fig.update_layout(yaxis_range=[10, 60])
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=12,
-                                      line=dict(width=2,
-                                                color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+            # Create SPT vs depth multi plots
+            fig = px.scatter(
+                df,
+                x='ISPT_NVAL',
+                y='ISPT_ELEV',
+                height=1600,
+                facet_col='GEOL_GEOL',
+                color='LOCA_ID',
+                labels={"ISPT_NVAL": "SPT 'N' value",
+                        "ISPT_ELEV": "Elevation (mAOD)",
+                        "GEOL_GEOL": "Geology code",
+                        "LOCA_ID": "EXPL Hole",
+                        "ISPT_REP": "Reported value"
+                        },
+                hover_data=["ISPT_REP"],
+                facet_col_wrap=4
+                )
+            fig.update_layout(title_text=f"""<b>SPT vs Elevation by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(xaxis_range=[0, 55])
+            fig.update_layout(yaxis_range=[10, 60])
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=12,
+                                          line=dict(width=2,
+                                                    color='DarkSlateGrey')),
+                              selector=dict(mode='markers'))
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
 
-        fig.write_html(dst+'/'+'SPTvsElevation.html')
-        webbrowser.open_new_tab(dst+'/'+'SPTvsElevation.html')
+            fig.write_html(dst+'/'+'SPTvsElevation.html')
+            webbrowser.open_new_tab(dst+'/'+'SPTvsElevation.html')
+
+        except:
+            feedback.pushInfo(f"No SPT/elevation data to plot, output skipped")
 
         # ======================MOISTURE CONYENT vs Depth===========================
 
@@ -296,45 +307,48 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             from LNMC left join GEOL on LNMC.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP and SAMP_TOP < GEOL_BASE
             order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
-        feedback.pushInfo(f"Result = {df}")
+        try:
+            df = pd.read_sql_query(qry, conn)
+            feedback.pushInfo(f"Result = {df}")
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create WC vs depth multi plots
-        fig = px.scatter(
-            df,
-            x='LNMC_MC',
-            y='SAMP_TOP',
-            height=1600,
-            facet_col='GEOL_GEOL',
-            color='LOCA_ID',
-            labels={"LNMC_MC": "Water content(%)",
-                    "SAMP_TOP": "Depth (mbgl)",
-                    "GEOL_GEOL": "Geology code",
-                    "LOCA_ID": "EXPL Hole"},
+            # Create WC vs depth multi plots
+            fig = px.scatter(
+                df,
+                x='LNMC_MC',
+                y='SAMP_TOP',
+                height=1600,
+                facet_col='GEOL_GEOL',
+                color='LOCA_ID',
+                labels={"LNMC_MC": "Water content(%)",
+                        "SAMP_TOP": "Depth (mbgl)",
+                        "GEOL_GEOL": "Geology code",
+                        "LOCA_ID": "EXPL Hole"},
 
-            facet_col_wrap=4
-            )
-        fig.update_layout(title_text=f"""<b>Water content vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(xaxis_range=[0, 110])
-        fig.update_layout(yaxis_range=[0, 35])
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=12,
-                                      line=dict(width=2,
-                                                color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
-        fig.update_yaxes(autorange='reversed')
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+                facet_col_wrap=4
+                )
+            fig.update_layout(title_text=f"""<b>Water content vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(xaxis_range=[0, 110])
+            fig.update_layout(yaxis_range=[0, 35])
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=12,
+                                          line=dict(width=2,
+                                                    color='DarkSlateGrey')),
+                              selector=dict(mode='markers'))
+            fig.update_yaxes(autorange='reversed')
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
-        fig.write_html(dst+'/'+'WaterContentvsDepth.html')
-        webbrowser.open_new_tab(dst+'/'+'WaterContentvsDepth.html')
+            fig.write_html(dst+'/'+'WaterContentvsDepth.html')
+            webbrowser.open_new_tab(dst+'/'+'WaterContentvsDepth.html')
+        except:
+            feedback.pushInfo(f"No water content data to plot, output skipped")
 
 
         # ======================MOISTURE CONYENT DIST=============================
@@ -345,44 +359,47 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             left join GEOL on LNMC.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP AND SAMP_TOP < GEOL_BASE)
             group by LNMC_MC, GEOL_GEOL order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
+        try:
+            df = pd.read_sql_query(qry, conn)
 
-        feedback.pushInfo(f"Result = {df}")
+            feedback.pushInfo(f"Result = {df}")
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create WC vs depth multi plots
-        fig = px.bar(
-            df,
-            x='LNMC_MC',
-            y='count',
-            height=1600,
-            facet_row='GEOL_GEOL',
-            color='GEOL_GEOL',
-            labels={"LNMC_MC": "Water content(%)",
-                    # "SAMP_TOP": "Depth (mbgl)",
-                    "GEOL_GEOL": "Geology code",
-                    # "LOCA_ID": "EXPL Hole"},
-                    },
-            facet_col_wrap=2
-            )
-        fig.update_layout(title_text=f"""<b>Water content distribution by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        # fig.update_traces(marker=dict(size=12,
-        #                           line=dict(width=2,
-        #                                     color='DarkSlateGrey')),
-        #               selector=dict(mode='markers'))
-        # fig.update_yaxes(autorange='reversed')
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+            # Create WC vs depth multi plots
+            fig = px.bar(
+                df,
+                x='LNMC_MC',
+                y='count',
+                height=1600,
+                facet_row='GEOL_GEOL',
+                color='GEOL_GEOL',
+                labels={"LNMC_MC": "Water content(%)",
+                        # "SAMP_TOP": "Depth (mbgl)",
+                        "GEOL_GEOL": "Geology code",
+                        # "LOCA_ID": "EXPL Hole"},
+                        },
+                facet_col_wrap=2
+                )
+            fig.update_layout(title_text=f"""<b>Water content distribution by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            # fig.update_traces(marker=dict(size=12,
+            #                           line=dict(width=2,
+            #                                     color='DarkSlateGrey')),
+            #               selector=dict(mode='markers'))
+            # fig.update_yaxes(autorange='reversed')
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
 
-        fig.write_html(dst+'/'+'WaterContentDist.html')
-        webbrowser.open_new_tab(dst+'/'+'WaterContentDist.html')
+            fig.write_html(dst+'/'+'WaterContentDist.html')
+            webbrowser.open_new_tab(dst+'/'+'WaterContentDist.html')
+        except:
+            feedback.pushInfo(f"No water content data/elevation data to plot, output skipped")
 
 
         # =========================UNDRAINED COHESION=====================
@@ -392,44 +409,47 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             from TRIT left join GEOL on TRIT.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP and SAMP_TOP < GEOL_BASE
             order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
-        feedback.pushInfo(f"Result = {df}")
+        try:
+            df = pd.read_sql_query(qry, conn)
+            feedback.pushInfo(f"Result = {df}")
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create WC vs depth multi plots
-        fig = px.scatter(
-            df,
-            x='TRIT_CU',
-            y='SAMP_TOP',
-            height=1600,
-            facet_col='GEOL_GEOL',
-            color='LOCA_ID',
-            labels={"TRIT_CU": "Undrained Cohesion (kN/m2)",
-                    "SAMP_TOP": "Depth (mbgl)",
-                    "GEOL_GEOL": "Geology code",
-                    "LOCA_ID": "EXPL Hole"},
-            facet_col_wrap=4
-            )
-        fig.update_layout(title_text=f"""<b>Undrained cohesion vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(xaxis_range=[0, 400])
-        fig.update_layout(yaxis_range=[0, 35])
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=12,
-                                      line=dict(width=2,
-                                                color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
-        fig.update_yaxes(autorange='reversed')
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+            # Create WC vs depth multi plots
+            fig = px.scatter(
+                df,
+                x='TRIT_CU',
+                y='SAMP_TOP',
+                height=1600,
+                facet_col='GEOL_GEOL',
+                color='LOCA_ID',
+                labels={"TRIT_CU": "Undrained Cohesion (kN/m2)",
+                        "SAMP_TOP": "Depth (mbgl)",
+                        "GEOL_GEOL": "Geology code",
+                        "LOCA_ID": "EXPL Hole"},
+                facet_col_wrap=4
+                )
+            fig.update_layout(title_text=f"""<b>Undrained cohesion vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(xaxis_range=[0, 400])
+            fig.update_layout(yaxis_range=[0, 35])
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=12,
+                                          line=dict(width=2,
+                                                    color='DarkSlateGrey')),
+                              selector=dict(mode='markers'))
+            fig.update_yaxes(autorange='reversed')
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
-        fig.write_html(dst+'/'+'UndrainedCohesionvsDepth.html')
-        webbrowser.open_new_tab(dst+'/'+'UndrainedCohesionvsDepth.html')
+            fig.write_html(dst+'/'+'UndrainedCohesionvsDepth.html')
+            webbrowser.open_new_tab(dst+'/'+'UndrainedCohesionvsDepth.html')
+        except:
+            feedback.pushInfo(f"No undrained cohesion data to plot, output skipped")
 
         # =========================PLASTICITY=====================
 
@@ -439,91 +459,94 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             on LLPL.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP AND SAMP_TOP < GEOL_BASE
             order by GEOL_GEOL"""
-        df = pd.read_sql_query(qry, conn)
-        feedback.pushInfo(f"Result = {df}")
-        lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
+        try:
+            df = pd.read_sql_query(qry, conn)
+            feedback.pushInfo(f"Result = {df}")
+            lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
 
-        # create plot (matplotlib)
-        pio.templates.default = "plotly_white"
+            # create plot (matplotlib)
+            pio.templates.default = "plotly_white"
 
-        # Create WC vs depth multi plots
-        fig = px.scatter(
-            df,
-            x='LLPL_LL',
-            y='IP',
-            height=1600,
-            facet_row='GEOL_GEOL',
-            color='LOCA_ID',
-            labels={"LLPL_LL": "Liquid Limit (%)",
-                    "LLPL_PL": "Plastic Limit (%)",
-                    "IP": "Plasticity Index (%)",
-                    "GEOL_GEOL": "Code",
-                    "LOCA_ID": "EXPL Hole"},
-            hover_data=["LLPL_PL"],
-            )
-        col = 1
-        for row in range(1, len(lst_GEOL_GEOL)+1):
-            feedback.pushInfo(f"Row = {row}")
+            # Create WC vs depth multi plots
+            fig = px.scatter(
+                df,
+                x='LLPL_LL',
+                y='IP',
+                height=1600,
+                facet_row='GEOL_GEOL',
+                color='LOCA_ID',
+                labels={"LLPL_LL": "Liquid Limit (%)",
+                        "LLPL_PL": "Plastic Limit (%)",
+                        "IP": "Plasticity Index (%)",
+                        "GEOL_GEOL": "Code",
+                        "LOCA_ID": "EXPL Hole"},
+                hover_data=["LLPL_PL"],
+                )
+            col = 1
+            for row in range(1, len(lst_GEOL_GEOL)+1):
+                feedback.pushInfo(f"Row = {row}")
 
 
-            fig.add_annotation(x=37, y=17, text='CL or OL',
-                               xref=f'x{col}', yref=f'y{row}', showarrow=False)
-            fig.add_annotation(x=63, y=43, text='CH or OH',
-                               xref=f'x{col}', yref=f'y{row}', showarrow=False)
-            fig.add_annotation(x=40, y=7, text='ML or OL',
-                               xref=f'x{col}', yref=f'y{row}', showarrow=False)
-            fig.add_annotation(x=70, y=23, text='MH or OH',
-                               xref=f'x{col}', yref=f'y{row}', showarrow=False)
-            fig.add_annotation(x=16, y=5.5, text='CL or ML',
-                               xref=f'x{col}', yref=f'y{row}', showarrow=False)
+                fig.add_annotation(x=37, y=17, text='CL or OL',
+                                   xref=f'x{col}', yref=f'y{row}', showarrow=False)
+                fig.add_annotation(x=63, y=43, text='CH or OH',
+                                   xref=f'x{col}', yref=f'y{row}', showarrow=False)
+                fig.add_annotation(x=40, y=7, text='ML or OL',
+                                   xref=f'x{col}', yref=f'y{row}', showarrow=False)
+                fig.add_annotation(x=70, y=23, text='MH or OH',
+                                   xref=f'x{col}', yref=f'y{row}', showarrow=False)
+                fig.add_annotation(x=16, y=5.5, text='CL or ML',
+                                   xref=f'x{col}', yref=f'y{row}', showarrow=False)
 
-            # A line
-            fig.add_shape(type="line", x0=25.5, x1=102, y0=4, y1=60,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1))
-            # max line
-            fig.add_shape(type="line", x0=0, x1=60, y0=0, y1=60,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1))
+                # A line
+                fig.add_shape(type="line", x0=25.5, x1=102, y0=4, y1=60,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1))
+                # max line
+                fig.add_shape(type="line", x0=0, x1=60, y0=0, y1=60,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1))
 
-            # U Line
-            fig.add_shape(type="line", x0=16, x1=16, y0=0, y1=7,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1, dash="dash"))
-            fig.add_shape(type="line", x0=16, x1=73, y0=7, y1=60,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1, dash="dash"))
+                # U Line
+                fig.add_shape(type="line", x0=16, x1=16, y0=0, y1=7,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1, dash="dash"))
+                fig.add_shape(type="line", x0=16, x1=73, y0=7, y1=60,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1, dash="dash"))
 
-            # CL ML box
-            fig.add_shape(type="line", x0=4, x1=25.5, y0=4, y1=4,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1))
-            fig.add_shape(type="line", x0=7, x1=29.5, y0=7, y1=7,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1))
+                # CL ML box
+                fig.add_shape(type="line", x0=4, x1=25.5, y0=4, y1=4,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1))
+                fig.add_shape(type="line", x0=7, x1=29.5, y0=7, y1=7,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1))
 
-            # LL line
-            fig.add_shape(type="line", x0=50, x1=50, y0=0, y1=60,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1))
+                # LL line
+                fig.add_shape(type="line", x0=50, x1=50, y0=0, y1=60,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1))
 
-        fig.update_layout(title_text=f"""<b>Plasticity by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(xaxis_range=[0, 110])
-        fig.update_layout(yaxis_range=[0, 60])
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=12,
-                                      line=dict(width=2,
-                                                color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+            fig.update_layout(title_text=f"""<b>Plasticity by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(xaxis_range=[0, 110])
+            fig.update_layout(yaxis_range=[0, 60])
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=12,
+                                          line=dict(width=2,
+                                                    color='DarkSlateGrey')),
+                              selector=dict(mode='markers'))
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
-        fig.write_html(dst+'/'+'PlasticityIndex.html')
-        webbrowser.open_new_tab(dst+'/'+'PlasticityIndex.html')
+            fig.write_html(dst+'/'+'PlasticityIndex.html')
+            webbrowser.open_new_tab(dst+'/'+'PlasticityIndex.html')
+        except:
+            feedback.pushInfo(f"No plasticity data to plot, output skipped")
 
             # =========================GRADING=====================
 
@@ -533,89 +556,91 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             from GRAT left join GEOL ON GRAT.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP and SAMP_TOP < GEOL_BASE
             order by GEOL_GEOL"""
-
-        df = pd.read_sql_query(qry, conn)
-        feedback.pushInfo(f"Result = {df}")
-
-
-        lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
-
-        pio.templates.default = "plotly_white"
-
-        # Create WC vs depth multi plots
-        fig = px.line(
-        df,
-        x='GRAT_SIZE',
-        y='GRAT_PERP',
-        log_x=True,
-        range_x=[0.001,200],
-        range_y=[0,100],
-        height = 4000,
-        facet_row = 'GEOL_GEOL',
-        color = 'LOCA_ID',
-        symbol = 'SAMP_TOP',
-        labels={"GRAT_SIZE": "Particle size diameter (mm)",
-                "GRAT_PERP": "Percent passing (%)",
-                "GEOL_GEOL": "Code",
-                "LOCA_ID": "EXPL Hole",
-                "SAMP_TYPE":"Sample Type"},
-        markers=True,
-        hover_data=["SAMP_TYPE"],
-        )
-        col = 1
-        for row in range(1, len(lst_GEOL_GEOL)+1):
-            # feedback.pushInfo(f"Row = {row}")
-            # Major divisions
-            fig.add_shape(type="line", x0=0.002, x1=0.002, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=2))
-            fig.add_shape(type="line", x0=0.06, x1=0.06, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=2))
-            fig.add_shape(type="line", x0=2, x1=2, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=2))
-            fig.add_shape(type="line", x0=60, x1=60, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=2))
-            #Minor divisions
-            fig.add_shape(type="line", x0=0.006, x1=0.006, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=0.02, x1=0.02, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=0.2, x1=0.2, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=0.6, x1=0.6, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=6, x1=6, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
-            fig.add_shape(type="line", x0=20, x1=20, y0=0, y1=100,
-                          xref=f'x{col}', yref=f'y{row}',
-                          line=dict(color="black", width=1.5, dash="dash"))
+        try:
+            df = pd.read_sql_query(qry, conn)
+            feedback.pushInfo(f"Result = {df}")
 
 
-        # fig.update_layout(xaxis_range=[0.001,2])
-        # fig.update_layout(yaxis_range=[0,100])
-        fig.update_layout(title_text=f"""<b>Particle size distribution by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
-                          title_x = title_hor_align),
-        fig.update_layout(margin_t=top_margin)
-        fig.update_layout(showlegend=True)
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
-        fig.update_traces(marker=dict(size=4,
-                                  line=dict(width=2,
-                                            color='DarkSlateGrey')),
-                      selector=dict(mode='markers'))
-        fig.update_layout(paper_bgcolor='#CFDBDF')
-        fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+            lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
 
-        fig.write_html(dst+'/'+'ParticleSizeDistribution.html')
-        webbrowser.open_new_tab(dst+'/'+'ParticleSizeDistribution.html')
+            pio.templates.default = "plotly_white"
+
+            # Create WC vs depth multi plots
+            fig = px.line(
+            df,
+            x='GRAT_SIZE',
+            y='GRAT_PERP',
+            log_x=True,
+            range_x=[0.001,200],
+            range_y=[0,100],
+            height = 4000,
+            facet_row = 'GEOL_GEOL',
+            color = 'LOCA_ID',
+            symbol = 'SAMP_TOP',
+            labels={"GRAT_SIZE": "Particle size diameter (mm)",
+                    "GRAT_PERP": "Percent passing (%)",
+                    "GEOL_GEOL": "Code",
+                    "LOCA_ID": "EXPL Hole",
+                    "SAMP_TYPE":"Sample Type"},
+            markers=True,
+            hover_data=["SAMP_TYPE"],
+            )
+            col = 1
+            for row in range(1, len(lst_GEOL_GEOL)+1):
+                # feedback.pushInfo(f"Row = {row}")
+                # Major divisions
+                fig.add_shape(type="line", x0=0.002, x1=0.002, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=2))
+                fig.add_shape(type="line", x0=0.06, x1=0.06, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=2))
+                fig.add_shape(type="line", x0=2, x1=2, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=2))
+                fig.add_shape(type="line", x0=60, x1=60, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=2))
+                #Minor divisions
+                fig.add_shape(type="line", x0=0.006, x1=0.006, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+                fig.add_shape(type="line", x0=0.02, x1=0.02, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+                fig.add_shape(type="line", x0=0.2, x1=0.2, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+                fig.add_shape(type="line", x0=0.6, x1=0.6, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+                fig.add_shape(type="line", x0=6, x1=6, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+                fig.add_shape(type="line", x0=20, x1=20, y0=0, y1=100,
+                              xref=f'x{col}', yref=f'y{row}',
+                              line=dict(color="black", width=1.5, dash="dash"))
+
+
+            # fig.update_layout(xaxis_range=[0.001,2])
+            # fig.update_layout(yaxis_range=[0,100])
+            fig.update_layout(title_text=f"""<b>Particle size distribution by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
+                              title_x = title_hor_align),
+            fig.update_layout(margin_t=top_margin)
+            fig.update_layout(showlegend=True)
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='DarkGray')
+            fig.update_traces(marker=dict(size=4,
+                                      line=dict(width=2,
+                                                color='DarkSlateGrey')),
+                          selector=dict(mode='markers'))
+            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
+
+            fig.write_html(dst+'/'+'ParticleSizeDistribution.html')
+            webbrowser.open_new_tab(dst+'/'+'ParticleSizeDistribution.html')
+        except:
+            feedback.pushInfo(f"No PSD data data to plot, output skipped")
 
             # ========data tables===========
         # TODO put in loop - read json?
@@ -625,35 +650,37 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         max(GEOL_TOP) as [maximum top depth], min(GEOL_BASE) as
         [minimum base depth], max(GEOL_BASE) as [maximum base depth] from GEOL
         group by GEOL_GEOL"""
+        try:
+            df = pd.read_sql_query(qry, conn)
+            df = df.replace(np.nan, "-")
+            html_table = df.to_html(index=False)
 
-        df = pd.read_sql_query(qry, conn)
-        df = df.replace(np.nan, "-")
-        html_table = df.to_html(index=False)
+            lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
+            # =================
+            table_title = "Table of all Samples and geology code"
+            qry = """select SAMP.LOCA_ID, SAMP_TOP, SAMP_BASE, SAMP_TYPE, SAMP_REF,
+            SAMP_RECV, GEOL_GEOL from SAMP
+            left join GEOL on SAMP.LOCA_ID = GEOL.LOCA_ID
+            where SAMP_TOP >= GEOL_TOP AND SAMP_TOP < GEOL_BASE"""
 
-        lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
-        # =================
-        table_title = "Table of all Samples and geology code"
-        qry = """select SAMP.LOCA_ID, SAMP_TOP, SAMP_BASE, SAMP_TYPE, SAMP_REF,
-        SAMP_RECV, GEOL_GEOL from SAMP
-        left join GEOL on SAMP.LOCA_ID = GEOL.LOCA_ID
-        where SAMP_TOP >= GEOL_TOP AND SAMP_TOP < GEOL_BASE"""
+            df = pd.read_sql_query(qry, conn)
+            df = df.replace(np.nan, "-")
+            html_table = df.to_html(index=False)
 
-        df = pd.read_sql_query(qry, conn)
-        df = df.replace(np.nan, "-")
-        html_table = df.to_html(index=False)
+            lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
 
-        lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
-
-        str_tables = '+'.join(lst_tables)
-        html_content = ("<style>table{border-collapse:collapse;width:60%}td,\
-                        th{text-align:left;padding:8px}tr:nth-child(even) \
-                        {background-color:#CFDBDF}</style><p>"+str_tables+ \
-                        "</table>")
+            str_tables = '+'.join(lst_tables)
+            html_content = ("<style>table{border-collapse:collapse;width:60%}td,\
+                            th{text-align:left;padding:8px}tr:nth-child(even) \
+                            {background-color:#CFDBDF}</style><p>"+str_tables+ \
+                            "</table>")
 
 
-        with open(dst+'/'+'tables.html', 'w') as f:
-            f.write(html_content)
-        webbrowser.open_new_tab(dst+'/'+'tables.html')
+            with open(dst+'/'+'tables.html', 'w') as f:
+                f.write(html_content)
+            webbrowser.open_new_tab(dst+'/'+'tables.html')
+        except:
+            feedback.pushInfo(f"Some data in the summary tables does not exist. Summary tables skipped.")
 
         conn.close()
 

@@ -113,7 +113,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFile(
                 self.INPUT,
                 self.tr('Input File'),
-                fileFilter='AGS (*.ags)'
+                fileFilter='AGS (*.ags);; text files (*.txt);; all files (*.*)'
 
             )
         )
