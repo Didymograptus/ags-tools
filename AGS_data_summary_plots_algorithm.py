@@ -237,7 +237,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             webbrowser.open_new_tab(dst+'/'+'SPTvsDepth.html')
 
         except:
-            feedback.pushInfo(f"No SPT data to plot, output skipped")
+            feedback.pushWarning(f"No SPT data to plot, output skipped")
 
         # =================SPT -Elevation==================================
         # create dataframe - link geology codes
@@ -298,7 +298,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             webbrowser.open_new_tab(dst+'/'+'SPTvsElevation.html')
 
         except:
-            feedback.pushInfo(f"No SPT/elevation data to plot, output skipped")
+            feedback.pushWarning(f"No SPT/elevation data to plot, output skipped")
 
         # ======================MOISTURE CONYENT vs Depth===========================
 
@@ -348,7 +348,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             fig.write_html(dst+'/'+'WaterContentvsDepth.html')
             webbrowser.open_new_tab(dst+'/'+'WaterContentvsDepth.html')
         except:
-            feedback.pushInfo(f"No water content data to plot, output skipped")
+            feedback.pushWarning(f"No water content data to plot, output skipped")
 
 
         # ======================MOISTURE CONYENT DIST=============================
@@ -399,7 +399,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             fig.write_html(dst+'/'+'WaterContentDist.html')
             webbrowser.open_new_tab(dst+'/'+'WaterContentDist.html')
         except:
-            feedback.pushInfo(f"No water content data/elevation data to plot, output skipped")
+            feedback.pushWarning(f"No water content data/elevation data to plot, output skipped")
 
 
         # =========================UNDRAINED COHESION=====================
@@ -449,7 +449,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             fig.write_html(dst+'/'+'UndrainedCohesionvsDepth.html')
             webbrowser.open_new_tab(dst+'/'+'UndrainedCohesionvsDepth.html')
         except:
-            feedback.pushInfo(f"No undrained cohesion data to plot, output skipped")
+            feedback.pushWarning(f"No undrained cohesion data to plot, output skipped")
 
         # =========================PLASTICITY=====================
 
@@ -546,7 +546,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             fig.write_html(dst+'/'+'PlasticityIndex.html')
             webbrowser.open_new_tab(dst+'/'+'PlasticityIndex.html')
         except:
-            feedback.pushInfo(f"No plasticity data to plot, output skipped")
+            feedback.pushWarning(f"No plasticity data to plot, output skipped")
 
             # =========================GRADING=====================
 
@@ -640,7 +640,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             fig.write_html(dst+'/'+'ParticleSizeDistribution.html')
             webbrowser.open_new_tab(dst+'/'+'ParticleSizeDistribution.html')
         except:
-            feedback.pushInfo(f"No PSD data data to plot, output skipped")
+            feedback.pushWarning(f"No PSD data data to plot, output skipped")
 
             # ========data tables===========
         # TODO put in loop - read json?
@@ -680,7 +680,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                 f.write(html_content)
             webbrowser.open_new_tab(dst+'/'+'tables.html')
         except:
-            feedback.pushInfo(f"Some data in the summary tables does not exist. Summary tables skipped.")
+            feedback.pushWarning(f"Some data in the summary tables does not exist. Summary tables skipped.")
 
         conn.close()
 
