@@ -3,33 +3,41 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=AGS Data summsry plots
+name=AGS Tools
 qgisMinimumVersion=3.0
-description=AGS data summary plots
-version=0.1
-author=Amageo Limited
-email=tony.daly@amageo.co.uk
+qgisMaximumVersion=4.99
+description=This plugin provides tools for working with files in the AGS4 format.
+author=Oliver Burdekin (burdGIS) and Richard Meredith (GeoEnvironmental)
+email=info@burdgis.com
 
-about=AGS data summary plot plugin
+about=This plugin parses an AGS4 file and creates a geopackage or SQlite database from it. AGS4 files can be validated using the British Geological Survey AGSAPI. Results/data returned by the API are subject to the API’s terms (Open Government Licence v3.0). Internet connection required.
+version=0.1.2
 
-tracker=http://bugs/tbc
-repository=http://repo/tbc
+
+
+tracker=https://github.com/Ojaybee/ags-tools/issues
+repository=https://github.com/Ojaybee/ags-tools
 # End of mandatory metadata
 
 # Recommended items:
 
 hasProcessingProvider=yes
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=
+v0.1.2 QGIS 4.0.0 compatible
+v0.1.1 Validator updated to use V6 (thanks KoalaGeo)
+
 
 # Tags are comma separated with spaces allowed
-tags=python
+tags=AGS4, geotechnical, engineering, validation,Processing, Geopackage
 
-homepage=http://homepage/tbc
+homepage=https://github.com/Ojaybee/ags-tools#readme
 category=Analysis
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
+license=GPL-2.0-or-later
+
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
@@ -39,9 +47,10 @@ deprecated=False
 # Check the documentation for more information.
 # plugin_dependencies=
 
-# Category of the plugin: Raster, Vector, Database or Web
+Category of the plugin: Raster, Vector, Database or Web
 # category=
 
 # If the plugin can run on QGIS Server.
 server=False
+
 
