@@ -457,18 +457,14 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
             QgsApplication.setDefaultSvgPaths(svg_paths)
             feedback.pushInfo("Added custom SVG path for symbols.")
 
-    # def loadLayerAndApplyStyle(self, output_path, table_name, qml_path, feedback):
+    # def loadLayerAndApplyStyle(self, output_path, qml_path, feedback):
         # # Load the layer using OGR provider. GPK and SpatiaLite are supported.
 
-        # layer_path = f"{output_path}|layername={table_name}"
-        # layer = QgsVectorLayer(layer_path, table_name, "ogr")
+        # layer_path = f"{output_path}|layername='LOCA'"
+        # layer = QgsVectorLayer(layer_path, 'LOCA', "ogr")
 
-        # if not layer.isValid():
-            # feedback.pushInfo(f"Table '{table_name}' cannot be added.")
-            # return None
-
-        # QgsProject.instance().addMapLayer(layer)
-        # feedback.pushInfo(f"Added '{table_name}' layer to the project.")
+        # # QgsProject.instance().addMapLayer(layer)
+        # # feedback.pushInfo(f"Added '{table_name}' layer to the project.")
 
         # if layer.isValid() and os.path.exists(qml_path):
             # layer.loadNamedStyle(qml_path)
@@ -478,7 +474,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         # if iface:
             # iface.layerTreeView().refreshLayerSymbology(layer.id())
 
-        # return layer
+        # # return layer
 
 
     def add_elev_calc_col(self, db_fpath: str, table_name: str, depth_col_names:list, feedback, col_name_loca_gl = 'LOCA_GL'):
@@ -531,21 +527,8 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
 
         conn.close()
 
-    def ApplyStyle(self, layer_name, qml_path, feedback):
-        # Load the layer using OGR provider. GPK and SpatiaLite are supported.
 
-        layer = QgsProject.instance().mapLayersByName(layer_name)
-
-        try:
-            if layer[0] and os.path.exists(qml_path):
-                layer[0].loadNamedStyle(qml_path)
-                layer[0].triggerRepaint()
-                feedback.pushInfo("Applied QML style to the LOCA layer.")
-        except:
-                feedback.pushInfo("QML style failed to apply to the LOCA layer.")
-
-
-    def load_all_layers(self, gpkg_path):
+    def load_all_layers(self, gpkg_path, qml_path):
         # load all layers
         project = QgsProject.instance()
 
@@ -556,14 +539,17 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         ags_fname = Path(gpkg_path).stem
         agsGroup = root.addGroup(ags_fname)
 
-
-
         for subLayer in subLayers:
             lyr_name = subLayer.split(QgsDataProvider.SUBLAYER_SEPARATOR)[1]
             uri = f"{gpkg_path}|layername={lyr_name}"
             # Create layer
             sub_vlayer = QgsVectorLayer(uri, lyr_name, 'ogr') # this is the place to map names if needed
             # Add layer to map in group))
+            try:
+                sub_vlayer.loadNamedStyle(qml_path)
+                sub_vlayer.triggerRepaint()
+            except:
+                        feedback.pushInfo("QML style failed to apply to the LOCA layer.")
             agsGroup.insertChildNode(-1,QgsLayerTreeLayer(QgsProject.instance().addMapLayer(sub_vlayer, False)))
 
 
@@ -792,8 +778,7 @@ class AGS2DBAlgorithm(QgsProcessingAlgorithm):
         # Copy the file from its temp location
         new_output_path = self.copy_files(parameters, context, output_path, feedback)
         self.create_database_connection(new_output_path, feedback)
-        self.load_all_layers(new_output_path)
-        self.ApplyStyle('LOCA', qml_path, feedback)
+        self.load_all_layers(new_output_path, qml_path)
         self.group_view(new_output_path, False)
         proj = QgsProject.instance()
         proj.setCrs(QgsCoordinateReferenceSystem(27700))
