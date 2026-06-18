@@ -23,6 +23,19 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+
+    This takes a Geopackage of AGS data and creates a series of summary plots,
+    grouped by Geology Code. It is intended to be used as a quick way to
+    visualise data, to spot any quality issues, but may be used in any way.
+    It uses the Plotly library to create charts and tables. The output is a
+    series of html files that the user saves to a directory. It also provides an
+     immediate output to the default browser
+
+    Useful future improvements:
+    Allow the user to select other fields such as GEOL_GEOL2
+    Add graphs and tables as required.
+    Refactor once established.
+
 """
 
 __author__ = 'Amageo Limited'
@@ -43,6 +56,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFolderDestination)
 
 from datetime import datetime
+import math
 import os
 import sqlite3
 import webbrowser
@@ -56,21 +70,10 @@ import plotly.io as pio
 
 class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
     """
-    This is an example algorithm that takes a vector layer and
-    creates a new identical one.
+    Inputs are designed to be simple, to make the process as
+    easy as possible for the user.
 
-    It is meant to be used as an example of how to create your own
-    algorithms and explain methods and variables used to do it. An
-    algorithm like this will be available in all elements, and there
-    is not need for additional work.
-
-    All Processing algorithms should extend the QgsProcessingAlgorithm
-    class.
     """
-
-    # Constants used to refer to parameters and outputs. They will be
-    # used when calling the algorithm from another algorithm, or when
-    # calling from the QGIS console.
 
     OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
@@ -123,30 +126,51 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
 
     def processAlgorithm(self, parameters, context, feedback):
         """
-        Summary of data plots.
+        The plots are currently in self-contained blocks of code due to the
+         stage of development. It is likely that this function will be refactored.
+
         The following plots will be generated if the data is available:
+        (update as necessary)
         1. SPT vs Depth
-        2. WC vs Depth
-        3. LL vs PL
+        2. SPT vs Elevation
+        3. WC vs Depth
+        4. WC distribution
+        5. Undrained cohesion vs depth
+        6. LL vs PI
+        7. PSD
+        8. Tables
+           - Summary table of Geology by GEOL_GEOL
+           - Table of all Samples and geology code
         """
         now = datetime.now()
         str_date_time =now.strftime("%Y-%m-%d %H:%M")
         database = parameters['INPUT']
+        html_page_bg = '#d7eaf7'
         database_fname = os.path.basename(database)
         str_stage = self.STAGE_OPTIONS[self.parameterAsEnum(parameters,
                                                             self.LIST1, context)]
         str_status = self.STATUS_OPTIONS[self.parameterAsEnum(parameters,
                                                               self.LIST2, context)]
+        def_graph_height = 650
         feedback.pushInfo(f"stage={str_stage}")
         feedback.pushInfo(f"status={str_status}")
         dst = parameters['OUTPUT']
         conn = sqlite3.connect(database)
         cur = conn.cursor()
-        # cur.execute('select * from ISPT where LOCA_ID = "BH504"')
-        # rows = cur.fetchall()
+        # get list and number of geol codes including blank
+        feedback.pushInfo(f"Fetching geology codes.")
+        try:
+            cur.execute('select distinct GEOL_GEOL from GEOL')
+            res = cur.fetchall()
+            num_codes = len(res)
+            lst_codes = []
+            for code in res:
+                lst_codes.append(code[0])
 
-        # for row in rows:
-            # feedback.pushInfo(f"Result={row}")
+            feedback.pushInfo(f"List of unique geology codes = {lst_codes}")
+        except:
+            feedback.pushInfo(f"Cannot read the geology codes.")
+
 
         # fetch project details
         try:
@@ -182,15 +206,17 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         # =================SPT -Depth==================================
         # create dataframe - link geology codes
 
-        qry = """select ISPT.LOCA_ID, ISPT_TOP, (ISPT_TOP + (ISPT_NPEN/1000))
-            as ISPT_BASE, ISPT_NVAL, ISPT_REP, GEOL_GEOL
-            from ISPT left join GEOL ON ISPT.LOCA_ID = GEOL.LOCA_ID
-            where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE
-            order by GEOL_GEOL"""
+        qry = """select ISPT.LOCA_ID, ISPT_TOP, ISPT_TOP+(cast(ISPT_NPEN as float)/1000) as ISPT_BASE,
+                 ISPT_NVAL, ISPT_REP, GEOL_GEOL
+                 from ISPT left join GEOL ON ISPT.LOCA_ID = GEOL.LOCA_ID
+                 where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE
+                 order by GEOL_GEOL"""
+
         try:
             df = pd.read_sql_query(qry, conn)
-
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
 
             # need to plot nulls as 50 where non full penetration
             # reported result visble in hover
@@ -198,13 +224,15 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
 
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 4
+            graph_ht = 300+(math.ceil(num_codes/cols)*def_graph_height)
 
             # Create SPT vs depth multi plots
             fig = px.scatter(
                 df,
                 x='ISPT_NVAL',
                 y='ISPT_TOP',
-                height=1600,
+                height=graph_ht,
                 facet_col='GEOL_GEOL',
                 color='LOCA_ID',
                 labels={"ISPT_NVAL": "SPT 'N' value",
@@ -215,7 +243,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                         },
 
                 hover_data=["ISPT_REP"],
-                facet_col_wrap=4
+                facet_col_wrap=cols
             )
             fig.update_layout(title_text=f"""<b>SPT vs Depth by geology code (GEOL_GEOL)</b>{str_cht_meta}""",
                               title_x = title_hor_align),
@@ -230,7 +258,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                                     color='DarkSlateGrey')),
                               selector=dict(mode='markers'))
             fig.update_yaxes(autorange='reversed')
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
             fig.write_html(dst+'/'+'SPTvsDepth.html')
@@ -245,28 +273,32 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             ISPT_NVAL, ISPT_REP, GEOL_GEOL, (LOCA_GL - ISPT_TOP)
             as ISPT_ELEV, LOCA_GL
             from
-            (select ISPT.LOCA_ID, ISPT_TOP, (ISPT_TOP + (ISPT_NPEN/1000))
-            as ISPT_BASE, ISPT_NVAL, ISPT_REP, GEOL_GEOL
-            from ISPT left join GEOL ON ISPT.LOCA_ID = GEOL.LOCA_ID
-            where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE) as SUB
+            (select ISPT.LOCA_ID, ISPT_TOP, ISPT_TOP+(cast(ISPT_NPEN as float)/1000) as ISPT_BASE,
+                 ISPT_NVAL, ISPT_REP, GEOL_GEOL
+                 from ISPT left join GEOL ON ISPT.LOCA_ID = GEOL.LOCA_ID
+                 where ISPT_TOP >= GEOL_TOP AND ISPT_BASE <= GEOL.GEOL_BASE) as SUB
             left join LOCA on SUB.LOCA_ID = LOCA.LOCA_ID
             order by GEOL_GEOL"""
         try:
             df = pd.read_sql_query(qry, conn)
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
 
             # Plot nulls as 50 where non full pen reported result visble in hover
             df["ISPT_NVAL"] = df["ISPT_NVAL"].fillna(50)
 
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 4
+            graph_ht = 300+(math.ceil(num_codes/cols)*def_graph_height)
 
             # Create SPT vs depth multi plots
             fig = px.scatter(
                 df,
                 x='ISPT_NVAL',
                 y='ISPT_ELEV',
-                height=1600,
+                height=graph_ht,
                 facet_col='GEOL_GEOL',
                 color='LOCA_ID',
                 labels={"ISPT_NVAL": "SPT 'N' value",
@@ -290,7 +322,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                           line=dict(width=2,
                                                     color='DarkSlateGrey')),
                               selector=dict(mode='markers'))
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
 
@@ -310,16 +342,20 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         try:
             df = pd.read_sql_query(qry, conn)
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
 
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 4
+            graph_ht = 300+(math.ceil(num_codes/cols)*def_graph_height)
 
             # Create WC vs depth multi plots
             fig = px.scatter(
                 df,
                 x='LNMC_MC',
                 y='SAMP_TOP',
-                height=1600,
+                height=graph_ht,
                 facet_col='GEOL_GEOL',
                 color='LOCA_ID',
                 labels={"LNMC_MC": "Water content(%)",
@@ -342,7 +378,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                                     color='DarkSlateGrey')),
                               selector=dict(mode='markers'))
             fig.update_yaxes(autorange='reversed')
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
             fig.write_html(dst+'/'+'WaterContentvsDepth.html')
@@ -351,7 +387,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushWarning(f"No water content data to plot, output skipped")
 
 
-        # ======================MOISTURE CONYENT DIST=============================
+        # ======================MOISTURE CONTENT DIST=============================
 
         # create dataframe - link geology codes
         qry = """SELECT LNMC_MC, count(LNMC_MC) as count, GEOL_GEOL
@@ -361,18 +397,23 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             group by LNMC_MC, GEOL_GEOL order by GEOL_GEOL"""
         try:
             df = pd.read_sql_query(qry, conn)
-
             feedback.pushInfo(f"Result = {df}")
-
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 1
+            if num_codes == 1:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height))
+            else:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height)/1.5)
 
             # Create WC vs depth multi plots
             fig = px.bar(
                 df,
                 x='LNMC_MC',
                 y='count',
-                height=1600,
+                height=graph_ht,
                 facet_row='GEOL_GEOL',
                 color='GEOL_GEOL',
                 labels={"LNMC_MC": "Water content(%)",
@@ -392,7 +433,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             #                                     color='DarkSlateGrey')),
             #               selector=dict(mode='markers'))
             # fig.update_yaxes(autorange='reversed')
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
 
@@ -402,7 +443,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             feedback.pushWarning(f"No water content data/elevation data to plot, output skipped")
 
 
-        # =========================UNDRAINED COHESION=====================
+        # =========================UNDRAINED COHESION vs Depth=====================
 
         # create dataframe - link geology codes
         qry = """select TRIT.LOCA_ID, SAMP_TOP, TRIT_CU, GEOL_GEOL
@@ -412,19 +453,23 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         try:
             df = pd.read_sql_query(qry, conn)
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
 
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 4
+            graph_ht = 300+(math.ceil(num_codes/cols)*def_graph_height)
 
             # Create WC vs depth multi plots
             fig = px.scatter(
                 df,
                 x='TRIT_CU',
                 y='SAMP_TOP',
-                height=1600,
+                height=graph_ht,
                 facet_col='GEOL_GEOL',
                 color='LOCA_ID',
-                labels={"TRIT_CU": "Undrained Cohesion (kN/m2)",
+                labels={"TRIT_CU": "Undrained Cohesion (kN/m<sup>2</sup>)",
                         "SAMP_TOP": "Depth (mbgl)",
                         "GEOL_GEOL": "Geology code",
                         "LOCA_ID": "EXPL Hole"},
@@ -443,7 +488,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                                     color='DarkSlateGrey')),
                               selector=dict(mode='markers'))
             fig.update_yaxes(autorange='reversed')
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
             fig.write_html(dst+'/'+'UndrainedCohesionvsDepth.html')
@@ -462,17 +507,24 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         try:
             df = pd.read_sql_query(qry, conn)
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
             lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
 
             # create plot (matplotlib)
             pio.templates.default = "plotly_white"
+            cols = 1
+            if num_codes == 1:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height))
+            else:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height)/1.5)
 
             # Create WC vs depth multi plots
             fig = px.scatter(
                 df,
                 x='LLPL_LL',
                 y='IP',
-                height=1600,
+                height=graph_ht,
                 facet_row='GEOL_GEOL',
                 color='LOCA_ID',
                 labels={"LLPL_LL": "Liquid Limit (%)",
@@ -540,7 +592,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                           line=dict(width=2,
                                                     color='DarkSlateGrey')),
                               selector=dict(mode='markers'))
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
             fig.write_html(dst+'/'+'PlasticityIndex.html')
@@ -559,6 +611,13 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         try:
             df = pd.read_sql_query(qry, conn)
             feedback.pushInfo(f"Result = {df}")
+            num_codes = len(df['GEOL_GEOL'].unique())
+            feedback.pushInfo(f"num_codes = {num_codes}")
+            cols = 1
+            if num_codes == 1:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height))
+            else:
+                graph_ht = 300+(math.ceil(num_codes/cols)*(def_graph_height)/1.2)
 
 
             lst_GEOL_GEOL = df['GEOL_GEOL'].unique()
@@ -573,7 +632,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             log_x=True,
             range_x=[0.001,200],
             range_y=[0,100],
-            height = 4000,
+            height = graph_ht,
             facet_row = 'GEOL_GEOL',
             color = 'LOCA_ID',
             symbol = 'SAMP_TOP',
@@ -634,7 +693,7 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
                                       line=dict(width=2,
                                                 color='DarkSlateGrey')),
                           selector=dict(mode='markers'))
-            fig.update_layout(paper_bgcolor='#CFDBDF')
+            fig.update_layout(paper_bgcolor=html_page_bg)
             fig.for_each_xaxis(lambda x: x.update(showticklabels=True))
 
             fig.write_html(dst+'/'+'ParticleSizeDistribution.html')
@@ -642,24 +701,71 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
         except:
             feedback.pushWarning(f"No PSD data data to plot, output skipped")
 
-            # ========data tables===========
-        # TODO put in loop - read json?
+        # ========data tables===========
+
         lst_tables =[]
-        table_title = "Summary table of Geology by GEOL_GEOL"
-        qry = """select GEOL_GEOL, min(GEOL_TOP) as [minimum top depth],
-        max(GEOL_TOP) as [maximum top depth], min(GEOL_BASE) as
-        [minimum base depth], max(GEOL_BASE) as [maximum base depth] from GEOL
-        group by GEOL_GEOL"""
+        lst_table_titles =[]
+
+        #==========Table 1==========
         try:
+            table_title = "Table 1: Geology code and exloratory hole min and max summary"
+            qry = """select GEOL_GEOL, ABBR.ABBR_DESC, min(GEOL_TOP) as [minimum top depth],
+            max(GEOL_TOP) as [maximum top depth], min(GEOL_BASE) as
+            [minimum base depth], max(GEOL_BASE) as [maximum base depth]
+            from GEOL join ABBR on GEOL.GEOL_GEOL = ABBR.ABBR_CODE
+            where ABBR_HDNG = 'GEOL_GEOL' group by GEOL_GEOL order by GEOL_GEOL"""
             df = pd.read_sql_query(qry, conn)
             df = df.replace(np.nan, "-")
             html_table = df.to_html(index=False)
 
-            lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
-            # =================
-            table_title = "Table of all Samples and geology code"
+            lst_tables.append('<h3 id="'+table_title+'">'+ table_title +'</h3>'+ html_table)
+            lst_table_titles.append(table_title)
+        except:
+            feedback.pushWarning(f"Summary table of Geology by GEOL_GEOL skipped")
+
+        #==========Table 2==========
+        try:
+            table_title = 'Table2:  Geology codes and associated exploratory holes'
+            qry = 'select distinct LOCA_ID, GEOL_GEOL from GEOL where length(GEOL_GEOL) > 0 '
+            df = pd.read_sql_query(qry, conn)
+            lst_codes = df['GEOL_GEOL'].unique()
+            dct_1 = {'GEOL_GEOL':lst_codes}
+            lst_code_loc =[]
+            dct_code_loc = {}
+            for code in lst_codes:
+                df1 = df.loc[df['GEOL_GEOL'] == code]
+                lst_loca_id = list(df1['LOCA_ID'])
+                lst_code_loc.append(lst_loca_id)
+            dct_2 = {'Hole List':lst_code_loc}
+            dct_code_loc.update(dct_1)
+            dct_code_loc.update(dct_2)
+            df = pd.DataFrame(dct_code_loc)
+            df = df.sort_values(by=['GEOL_GEOL'])
+            html_table = df.to_html(index=False)
+
+            lst_tables.append('<h3 id="'+table_title+'">'+ table_title +'</h3>'+ html_table)
+            lst_table_titles.append(table_title)
+        except:
+            feedback.pushWarning(f"Summary table Geology codes and exploratory holes skipped")
+
+        #==========Table 3==========
+        try:
+            table_title = "Table 3: Missing geology codes (GEOL_GEOL)"
+            qry = """select LOCA_ID, GEOL_TOP, GEOL_BASE, GEOL_GEOL from GEOL where length(GEOL_GEOL) = 0"""
+
+            df = pd.read_sql_query(qry, conn)
+            df = df.replace(np.nan, "-")
+            html_table = df.to_html(index=False)
+
+            lst_tables.append('<h3 id="'+table_title+'">'+ table_title +'</h3>'+ html_table)
+            lst_table_titles.append(table_title)
+        except:
+            feedback.pushWarning(f"Table of all Samples and geology code")
+        #==========Table 4==========
+        try:
+            table_title = "Table 4: Samples and associated geology code"
             qry = """select SAMP.LOCA_ID, SAMP_TOP, SAMP_BASE, SAMP_TYPE, SAMP_REF,
-            SAMP_RECV, GEOL_GEOL from SAMP
+            SAMP_CONT, SAMP_RECV, SAMP_CLSS, SAMP_DESC, GEOL_GEOL from SAMP
             left join GEOL on SAMP.LOCA_ID = GEOL.LOCA_ID
             where SAMP_TOP >= GEOL_TOP AND SAMP_TOP < GEOL_BASE"""
 
@@ -667,20 +773,70 @@ class ags_data_summary_plotsAlgorithm(QgsProcessingAlgorithm):
             df = df.replace(np.nan, "-")
             html_table = df.to_html(index=False)
 
-            lst_tables.append('<h3>'+ table_title +'</h3>'+ html_table)
+            lst_tables.append('<h3 id="'+table_title+'">'+ table_title +'</h3>'+ html_table)
+            lst_table_titles.append(table_title)
+        except:
+            feedback.pushWarning(f"Table of all Samples and geology code")
+
+        #======compile html page=============
+        try:
+            str_table_body = ''
+            str_table_start = "<p><ul>"
+            str_table_end = "</ul></p>"
+            for table in lst_table_titles:
+                str_table_item = f'<li><a href="#{table}">{table}</a></li>'
+                str_table_body = str_table_body + str_table_item
+
+            str_table_list = str_table_start + str_table_body + str_table_end
 
             str_tables = '+'.join(lst_tables)
-            html_content = ("<style>table{border-collapse:collapse;width:60%}td,\
-                            th{text-align:left;padding:8px}tr:nth-child(even) \
-                            {background-color:#CFDBDF}</style><p>"+str_tables+ \
-                            "</table>")
 
+            html_content = ("<p>" + str_cht_meta + "</p>"\
+                            + str_table_list + \
+                            str_tables
+                            )
+
+            html_header = """   <!DOCTYPE html>
+                                <html>
+                                <head>
+                                <style>
+                                *
+                                {
+                                   font-size: 1em !important;
+                                   font-family: Arial !important;
+                                }
+                                p {text-align: center;
+                                   color: midnightblue;
+                                   }
+                                body {
+                                background-color: RGB(215,234,247);
+                                    }
+                                table {
+                                  border-collapse: collapse;
+                                }
+                                th, td {
+                                  padding: 7.5px;
+                                  text-align: left;
+                                  border: 1px solid #9a9996;
+                                }
+                                thead tr {background-color: #1c71d8; color:#FFF;}
+                                tbody tr:nth-child(odd) {background-color: #FFF;}
+                                tbody tr:nth-child(even) {background-color: #EAEAEA;}
+                                </style>
+                                </head>
+                                <body>"""
+
+            html_footer = """</body>
+                             </html>"""
 
             with open(dst+'/'+'tables.html', 'w') as f:
+                f.write(html_header)
+            with open(dst+'/'+'tables.html', 'a') as f:
                 f.write(html_content)
+                f.write(html_footer)
             webbrowser.open_new_tab(dst+'/'+'tables.html')
         except:
-            feedback.pushWarning(f"Some data in the summary tables does not exist. Summary tables skipped.")
+            feedback.pushWarning(f"Error creating summary table output.")
 
         conn.close()
 
