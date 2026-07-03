@@ -1,0 +1,66 @@
+
+h1 {
+  font-weight: bold!important;
+}
+
+
+img {
+    border: 1px solid #555;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
+
+table,
+th,
+td {
+    text-align: left;
+    border: 1px solid;
+    border-color: #0F176C;
+    font-size: 15px;
+}
+
+th {
+    background-color: #009bef;
+    color: white;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+    color: var(--md-admonition-fg-color);
+    font-size: .8rem;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
+
+/*
+Source - https://stackoverflow.com/a/52058198
+Posted by András Aszódi, modified by community. See post 'Timeline' for change history
+Retrieved 2026-06-26, License - CC BY-SA 4.0
+*/
+a[target="_blank"]::after {
+    content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAQElEQVR42qXKwQkAIAxDUUdxtO6/RBQkQZvSi8I/pL4BoGw/XPkh4XigPmsUgh0626AjRsgxHTkUThsG2T/sIlzdTsp52kSS1wAAAABJRU5ErkJggg==);
+    margin: 0 3px 0 5px;
+}
+
+hr:after {
+    content: '';
+    display: block;
+    margin-top: 2px;
+    border-top: 1px solid #8c8b8b;
+    border-bottom: 1px solid #fff;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
