@@ -1,0 +1,131 @@
+# go to venv and activate ~/Documents/venvs/mkdocs/.venv
+# mkdocs serve -f '/home/tony/Dropbox/Amageo/HA Work/Arup/SPaTS/T0377-geo-data/working/data_visualisation/ags-nh-data-vis-docs/mkdocs.yml'
+
+site_name: 'National Highways AGS data visualisation Guidance'
+site_url: 'https://github.com/Didymograptus/ags-nh-data-vis-docs'
+
+site_description: 'National Highways AGS data visualisation Guidance'
+site_author: 'Arup-Aecom'
+
+# Please update the document version below:
+# it informs the site builder wrt version/tags etc.
+# Document Version: 1.0.1
+
+theme:
+  name: "material"
+  logo: icons/NH-icon.svg
+  palette:
+  - media: "(prefers-color-scheme)"
+    primary:
+    scheme:
+    toggle:
+      icon: material/brightness-auto
+      name: Switch to light mode
+  - media: "(prefers-color-scheme: light)"
+    scheme: custom
+    primary:
+    accent: purple
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+  - media: "(prefers-color-scheme: dark)"
+    scheme: slate
+    primary: blue
+    accent: lime
+    toggle:
+      icon: material/weather-night
+      name: Switch to system mode
+  features:
+    - content.code.copy
+
+
+plugins:
+- search:
+- glightbox:
+- kroki:
+    file_type_overrides:
+        mermaid: png
+- to-pdf:
+    cover_title: National Highways AGS Data Visualisation Guidance
+    cover_subtitle: Version 0.1, July 2026
+    cover_logo: https://www.actionsustainability.com/wp-content/uploads/bis-images/6733/National-Highways-logo-1600x555.png
+    toc_title: "Contents"
+    ordered_chapter_level: 2
+
+- open-in-new-tab: #https://github.com/JakubAndrysek/mkdocs-open-in-new-tab
+    add_icon: true
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        paths: []
+        options:
+          docstring_style: numpy
+          members_order: source
+          filters: ["!^_"]
+          docstring_section_style: table
+
+extra:
+  font: false
+  #version:
+    #provider: mike
+    #alias: true
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - admonition
+  - footnotes
+  - codehilite
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - toc:
+        permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# Copyright
+copyright: 'Copyright &copy; 2026 Arup-Aecom'
+
+extra_css:
+    - 'stylesheets/extra.css'
+
+nav:
+  - Purpose/Scope: index.md
+  - Overview of toolkit: gen_overview.md
+  - QGIS general:
+      - Introduction to QGIS for Engineers: qgis_introduction.md
+      - Output Layouts in QGIS: qgis_layouts.md
+      - QGIS useful plugins:
+        - Openlog: qgis_openlog.md
+        - DataPlotly: qgis_dataplotly.md
+        - Relations: qgis_relationships.md
+  - Data preparation: gen_data_prep.md
+  - Data visualisation workflow: gen_workflow.md
+  - Data visualisation using AGS Tools QGIS Plugin:
+      - General overview: ags_tools_general.md
+      - Validate AGS files: ags_tools_validator.md
+      - Create database from AGS (AGS2DB): ags_tools_ags2db.md
+      - Create CSV for PowerBI from AGS (AGS2CSV): ags_tools_ags2csv.md
+      - Create CSV for PowerBI from database (DB2CSV): ags_tools_db2csv.md
+      - Visualisation summary charts in QGIS: ags_tools_summary_charts.md
+      - Geological sections in QGIS: ags_tools_geol_sections.md
+  - Power BI:
+      - Introduction to PowerBI Dashboard: powerbi_get_data.md
+      - Opening the PowerBI Template: powerbi_plot.md
+      - PowerBI General Features: powerbi_gen_features.md
+      - Available Geotechnical Pages: powerbi_pages.md
+      - Troubleshooting and Useful Checks: powerbi_checks.md
+      - Output: powerbi_output.md
+  - Help and feedback: gen_help_feedback.md
+  - Guidance for IT: gen_it_guidance.md
+  - FAQs: gen_faqs.md
