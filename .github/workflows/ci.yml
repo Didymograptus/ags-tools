@@ -30,6 +30,6 @@ jobs:
       - run: pip install mkdocs-open-in-new-tab
       - run: pip install 'mkdocstrings[python]'
       - run: pip install mkdocs-kroki-plugin
-      - run: pip install pip install mkdocs-to-pdf[all]
+      - run: pip install mkdocs-to-pdf[all]
       - run: mkdocs gh-deploy --force
 
