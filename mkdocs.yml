@@ -46,6 +46,7 @@ plugins:
     file_type_overrides:
         mermaid: png
 - to-pdf:
+    output_path: NH-AGS-Data-visualisation-Guidance.pdf
     cover_title: National Highways AGS Data Visualisation Guidance
     cover_subtitle: Version 0.1, July 2026
     cover_logo: https://www.actionsustainability.com/wp-content/uploads/bis-images/6733/National-Highways-logo-1600x555.png
